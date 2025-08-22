@@ -116,7 +116,8 @@ class CSVConverter:
             course_name=csv_row.course_name or "",  # Use empty string if None
             location=csv_row.location,
             instructor=csv_row.main_tutor or "",  # Use empty string if None
-            assistant=csv_row.helping_stuff or ""  # Use empty string if None
+            assistant=csv_row.helping_stuff or "",  # Use empty string if None
+            is_half_slot=csv_row.is_half_slot or False  # Handle half slot field
         )
     
     def create_empty_day_schedule(self) -> DaySchedule:

@@ -60,6 +60,49 @@ class TestCSVRow:
         assert csv_row.teaching_hours == "3"
         assert csv_row.teaching_hours_printable == "(3)"
 
+    def test_csv_row_with_half_slot(self):
+        """Test creating CSVRow with half slot"""
+        data = {
+            "day": "الاثنين",
+            "slot": 1,
+            "is_half_slot": True,
+            "code": "EMP-104",
+            "activityType": "تمارين",
+            "location": "مدرج 1",
+            "course_name": "Test Course",
+            "day_slot": "الاثنين 1",
+            "time": "المحاضرة الاولي 8:50 - 10:20",
+            "day_order": 2,
+            "main_tutor": "د.اميرة الدسوقي",
+            "helping_stuff": "م.اندرو امجد"
+        }
+        
+        csv_row = CSVRow(**data)
+        
+        assert csv_row.is_half_slot == True
+        assert csv_row.slot == 1
+        assert csv_row.code == "EMP-104"
+    
+    def test_csv_row_without_half_slot(self):
+        """Test creating CSVRow without half slot (default False)"""
+        data = {
+            "day": "الاثنين",
+            "slot": 1,
+            "code": "EMP-104",
+            "activityType": "تمارين",
+            "location": "مدرج 1",
+            "course_name": "Test Course",
+            "day_slot": "الاثنين 1",
+            "time": "المحاضرة الاولي 8:50 - 10:20",
+            "day_order": 2,
+            "main_tutor": "د.اميرة الدسوقي",
+            "helping_stuff": "م.اندرو امجد"
+        }
+        
+        csv_row = CSVRow(**data)
+        
+        assert csv_row.is_half_slot == False  # Default value
+
 
 class TestScheduleEntry:
     """Test cases for ScheduleEntry model"""
@@ -77,6 +120,23 @@ class TestScheduleEntry:
         assert entry.location == "مدرج 1"
         assert entry.instructor == "د.اميرة الدسوقي"
         assert entry.assistant == "م.اندرو امجد"
+        assert entry.is_half_slot == False  # Default value
+    
+    def test_schedule_entry_with_half_slot(self):
+        """Test creating ScheduleEntry with half slot"""
+        entry = ScheduleEntry(
+            course_name="Test Course",
+            location="مدرج 1",
+            instructor="د.اميرة الدسوقي",
+            assistant="م.اندرو امجد",
+            is_half_slot=True
+        )
+        
+        assert entry.course_name == "Test Course"
+        assert entry.location == "مدرج 1"
+        assert entry.instructor == "د.اميرة الدسوقي"
+        assert entry.assistant == "م.اندرو امجد"
+        assert entry.is_half_slot == True
 
 
 class TestEnums:

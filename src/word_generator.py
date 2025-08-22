@@ -36,12 +36,16 @@ class ColumnType(Enum):
     DAYS = 0
     CATEGORIES = 1
     TIME_SLOT_1 = 2
-    SEPARATOR_1 = 3
-    TIME_SLOT_2 = 4
-    SEPARATOR_2 = 5
-    TIME_SLOT_3 = 6
-    SEPARATOR_3 = 7
-    TIME_SLOT_4 = 8
+    TIME_SLOT_1_HALF = 3  # Half slot column for slot 1
+    SEPARATOR_1 = 4
+    TIME_SLOT_2 = 5
+    TIME_SLOT_2_HALF = 6  # Half slot column for slot 2
+    SEPARATOR_2 = 7
+    TIME_SLOT_3 = 8
+    TIME_SLOT_3_HALF = 9  # Half slot column for slot 3
+    SEPARATOR_3 = 10
+    TIME_SLOT_4 = 11
+    TIME_SLOT_4_HALF = 12  # Half slot column for slot 4
 
 
 class RowType(Enum):
@@ -84,12 +88,13 @@ class TableDimensions:
     
     # Table structure
     TOTAL_ROWS = 21  # 5 days * 4 categories + 1 header
-    TOTAL_COLUMNS = 9  # 6 data columns + 3 separators
+    TOTAL_COLUMNS = 13  # 6 data columns + 3 separators + 4 half slots
     
     # Column widths (in inches)
     DAYS_COLUMN_WIDTH = 0.8
     CATEGORIES_COLUMN_WIDTH = 1.0
-    TIME_SLOT_WIDTH = 1.2
+    TIME_SLOT_WIDTH = 0.6
+    TIME_SLOT_HALF_WIDTH = 0.6  # Half width for half slots
     SEPARATOR_WIDTH = 0.2
     
     # Row structure
@@ -123,6 +128,12 @@ class WordGenerator:
             ColumnType.TIME_SLOT_3.value,
             ColumnType.TIME_SLOT_4.value
         ]
+        self.time_slot_half_positions = [
+            ColumnType.TIME_SLOT_1_HALF.value,
+            ColumnType.TIME_SLOT_2_HALF.value,
+            ColumnType.TIME_SLOT_3_HALF.value,
+            ColumnType.TIME_SLOT_4_HALF.value
+        ]
         self.separator_positions = [
             ColumnType.SEPARATOR_1.value,
             ColumnType.SEPARATOR_2.value,
@@ -135,12 +146,16 @@ class WordGenerator:
             ColumnType.DAYS.value: TableDimensions.DAYS_COLUMN_WIDTH,
             ColumnType.CATEGORIES.value: TableDimensions.CATEGORIES_COLUMN_WIDTH,
             ColumnType.TIME_SLOT_1.value: TableDimensions.TIME_SLOT_WIDTH,
+            ColumnType.TIME_SLOT_1_HALF.value: TableDimensions.TIME_SLOT_HALF_WIDTH,
             ColumnType.SEPARATOR_1.value: TableDimensions.SEPARATOR_WIDTH,
             ColumnType.TIME_SLOT_2.value: TableDimensions.TIME_SLOT_WIDTH,
+            ColumnType.TIME_SLOT_2_HALF.value: TableDimensions.TIME_SLOT_HALF_WIDTH,
             ColumnType.SEPARATOR_2.value: TableDimensions.SEPARATOR_WIDTH,
             ColumnType.TIME_SLOT_3.value: TableDimensions.TIME_SLOT_WIDTH,
+            ColumnType.TIME_SLOT_3_HALF.value: TableDimensions.TIME_SLOT_HALF_WIDTH,
             ColumnType.SEPARATOR_3.value: TableDimensions.SEPARATOR_WIDTH,
-            ColumnType.TIME_SLOT_4.value: TableDimensions.TIME_SLOT_WIDTH
+            ColumnType.TIME_SLOT_4.value: TableDimensions.TIME_SLOT_WIDTH,
+            ColumnType.TIME_SLOT_4_HALF.value: TableDimensions.TIME_SLOT_HALF_WIDTH
         }
     
     def create_document(self) -> Document:
@@ -224,11 +239,25 @@ class WordGenerator:
         
         # Fill each time slot in separate columns with separators
         for i, time_slot in enumerate(self.time_slots):
-            cell = header_row.cells[self.time_slot_positions[i]]
-            cell.text = time_slot
-            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-            # Set RTL for header cells
-            self._set_cell_rtl(cell)
+            # Main time slot column
+            main_cell = header_row.cells[self.time_slot_positions[i]]
+            half_cell = header_row.cells[self.time_slot_half_positions[i]]
+            
+            # Set content in main cell and merge with half cell
+            main_cell.text = time_slot
+            main_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            self._set_cell_rtl(main_cell)
+            
+            # Merge main and half slot columns for header
+            main_cell.merge(half_cell)
+            # Clean up any extra paragraphs that might cause newlines
+            if len(main_cell.paragraphs) > 1:
+                # Keep only the first paragraph
+                for i in range(len(main_cell.paragraphs) - 1, 0, -1):
+                    main_cell.paragraphs[i]._element.getparent().remove(main_cell.paragraphs[i]._element)
+            # Re-apply formatting after cleanup
+            main_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            self._set_cell_rtl(main_cell)
         
         # Set separator columns to empty
         for pos in self.separator_positions:
@@ -264,24 +293,56 @@ class WordGenerator:
                 
                 # Time slot columns with separators
                 for slot_index, slot_key in enumerate(self.slot_keys):
-                    cell = row.cells[self.time_slot_positions[slot_index]]
+                    main_cell = row.cells[self.time_slot_positions[slot_index]]
+                    half_cell = row.cells[self.time_slot_half_positions[slot_index]]
                     schedule_entry = day_schedule[slot_key]
                     
                     if schedule_entry:
+                        # Determine content based on category
                         if category_index == 0:  # Course name
-                            cell.text = schedule_entry.course_name
+                            content = schedule_entry.course_name
                         elif category_index == 1:  # Location
-                            cell.text = schedule_entry.location
+                            content = schedule_entry.location
                         elif category_index == 2:  # Instructor
-                            cell.text = schedule_entry.instructor
+                            content = schedule_entry.instructor
                         elif category_index == 3:  # Assistant
-                            cell.text = schedule_entry.assistant
+                            content = schedule_entry.assistant
+                        else:
+                            content = ""
+                        
+                        # Handle half slot logic
+                        if schedule_entry.is_half_slot:
+                            # For half slots: put content in main column, leave half column empty
+                            main_cell.text = content
+                            half_cell.text = ""
+                        else:
+                            # For full slots: merge the cells and put content across both columns
+                            main_cell.text = content
+                            half_cell.text = ""
+                            # Merge the cells horizontally (main + half slot columns)
+                            main_cell.merge(half_cell)
+                            # Clean up any extra paragraphs that might cause newlines
+                            if len(main_cell.paragraphs) > 1:
+                                # Keep only the first paragraph
+                                for i in range(len(main_cell.paragraphs) - 1, 0, -1):
+                                    main_cell.paragraphs[i]._element.getparent().remove(main_cell.paragraphs[i]._element)
+                            # Re-apply formatting after cleanup
+                            main_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            self._set_cell_rtl(main_cell)
                     else:
-                        cell.text = ""
-                    
-                    # Set RTL and center alignment for all time slot cells
-                    cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    self._set_cell_rtl(cell)
+                        # Empty slot: merge the cells and leave both empty
+                        main_cell.text = ""
+                        half_cell.text = ""
+                        # Merge the cells horizontally (main + half slot columns)
+                        main_cell.merge(half_cell)
+                        # Clean up any extra paragraphs that might cause newlines
+                        if len(main_cell.paragraphs) > 1:
+                            # Keep only the first paragraph
+                            for i in range(len(main_cell.paragraphs) - 1, 0, -1):
+                                main_cell.paragraphs[i]._element.getparent().remove(main_cell.paragraphs[i]._element)
+                        # Re-apply formatting after cleanup
+                        main_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        self._set_cell_rtl(main_cell)
                 
                 # Set separator columns to empty
                 for pos in self.separator_positions:
@@ -318,8 +379,10 @@ class WordGenerator:
                         row_type = RowType.DAY_MIDDLE
                 
                 # Determine border widths
-                # Vertical borders: thick for time slot columns, thin for others
-                if col_index in self.time_slot_positions:
+                # Vertical borders: thick for time slot columns (both main and half), thin for others
+                if (col_index in self.time_slot_positions or 
+                    col_index in self.time_slot_half_positions or 
+                    col_index in self.separator_positions):
                     vertical_border_width = str(BorderWidth.THICK)
                 else:
                     vertical_border_width = str(BorderWidth.THIN)
@@ -368,8 +431,8 @@ class WordGenerator:
         elif col_index == ColumnType.CATEGORIES.value and row_index > TableDimensions.HEADER_ROW_INDEX:
             self._apply_background_color(tcPr, ColorScheme.CATEGORIES_COLUMN)
         
-        # Time slots in header row
-        elif row_index == TableDimensions.HEADER_ROW_INDEX and col_index in self.time_slot_positions:
+        # Time slots in header row (both main and half slot columns)
+        elif row_index == TableDimensions.HEADER_ROW_INDEX and (col_index in self.time_slot_positions or col_index in self.time_slot_half_positions):
             self._apply_background_color(tcPr, ColorScheme.HEADER_BACKGROUND)
         
         # Separator columns in header row

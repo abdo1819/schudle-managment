@@ -451,3 +451,29 @@ class TestCSVConverter:
             
         finally:
             os.unlink(temp_file)
+    
+    def test_create_schedule_entry_with_half_slot(self):
+        """Test creating ScheduleEntry from CSVRow with half slot"""
+        csv_row = CSVRow(
+            day="الاثنين",
+            slot=1,
+            is_half_slot=True,
+            code="EMP-104",
+            activity_type="تمارين",
+            location="مدرج 1",
+            course_name="Test Course",
+            day_slot="الاثنين 1",
+            time="المحاضرة الاولي 8:50 - 10:20",
+            day_order=2,
+            main_tutor="د.اميرة الدسوقي",
+            helping_stuff="م.اندرو امجد"
+        )
+        
+        entry = self.converter.create_schedule_entry(csv_row)
+        
+        assert isinstance(entry, ScheduleEntry)
+        assert entry.course_name == "Test Course"
+        assert entry.location == "مدرج 1"
+        assert entry.instructor == "د.اميرة الدسوقي"
+        assert entry.assistant == "م.اندرو امجد"
+        assert entry.is_half_slot == True

@@ -33,6 +33,7 @@ class CSVRow(BaseModel):
     is_valid: Optional[str] = None
     day: str
     slot: int
+    is_half_slot: Optional[bool] = Field(default=False, description="Whether this is a half slot")
     code: str
     speciality: Optional[str] = None
     activity_type: str = Field(alias="activityType")
@@ -58,6 +59,7 @@ class ScheduleEntry(BaseModel):
     location: str
     instructor: Optional[str] = None
     assistant: Optional[str] = None
+    is_half_slot: bool = Field(default=False, description="Whether this is a half slot")
 
 
 class DaySchedule(TypedDict):
