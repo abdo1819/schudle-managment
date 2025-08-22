@@ -228,6 +228,7 @@ class WordGenerator:
         self._fill_header_row(table)
         self._fill_content_rows(table, weekly_schedule)
         self._apply_formatting(table)
+        self._apply_table_outline_borders(table)
     
     def _fill_header_row(self, table) -> None:
         """Fill the header row with time slots"""
@@ -284,6 +285,8 @@ class WordGenerator:
                     # Merge vertically with next 3 rows
                     if row_index + 3 < len(table.rows):
                         day_cell.merge(table.rows[row_index + 3].cells[ColumnType.DAYS.value])
+                        # Reapply thick borders to merged day cell
+                        self._apply_day_cell_borders(day_cell, row_index)
                 
                 # Category column
                 category_cell = row.cells[ColumnType.CATEGORIES.value]
@@ -378,18 +381,8 @@ class WordGenerator:
                     else:
                         row_type = RowType.DAY_MIDDLE
                 
-                # Determine border widths
-                # Start with default rules
-                if (col_index in self.time_slot_positions or 
-                    col_index in self.time_slot_half_positions or 
-                    col_index in self.separator_positions):
-                    vertical_border_width = str(BorderWidth.THICK)
-                else:
-                    vertical_border_width = str(BorderWidth.THIN)
-
-                # Ensure thick vertical borders for the day names column (outer-left outline)
-                if col_index == ColumnType.DAYS.value:
-                    vertical_border_width = str(BorderWidth.THICK)
+                # Ensure thick vertical borders for the day names and categories column (outer-left outline)
+                vertical_border_width = str(BorderWidth.THICK)
                 
                 # Horizontal borders depend on row type
                 if row_type == RowType.HEADER:
@@ -430,6 +423,87 @@ class WordGenerator:
                     cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
                     self._set_cell_rtl(cell)
     
+    def _apply_day_cell_borders(self, day_cell, row_index: int) -> None:
+        """Apply thick borders to merged day cells after merging"""
+        tc = day_cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        
+        # Remove any existing borders
+        for child in tcPr:
+            if child.tag.endswith('tcBorders'):
+                tcPr.remove(child)
+        
+        # For merged cells, we need to ensure the borders apply to the entire merged region
+        # Check if this is a merged cell by looking for vMerge element
+        is_merged = False
+        for child in tcPr:
+            if child.tag.endswith('vMerge'):
+                is_merged = True
+                break
+        
+        # Apply thick borders all around the merged day cell
+        # For merged cells, we need to be more explicit about the border application
+        if is_merged:
+            # Use more explicit border settings for merged cells
+            tcBorders = parse_xml(f'<w:tcBorders {nsdecls("w")}>'
+                                f'<w:top w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                                f'<w:left w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                                f'<w:bottom w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                                f'<w:right w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                                f'<w:insideH w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+                                f'<w:insideV w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+                                f'</w:tcBorders>')
+        else:
+            # Standard border application for non-merged cells
+            tcBorders = parse_xml(f'<w:tcBorders {nsdecls("w")}>'
+                                f'<w:top w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                                f'<w:left w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                                f'<w:bottom w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                                f'<w:right w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                                f'</w:tcBorders>')
+        
+        tcPr.append(tcBorders)
+        
+        # Reapply background color for day column
+        self._apply_background_color(tcPr, ColorScheme.DAYS_COLUMN)
+        
+        # Ensure font formatting is maintained
+        for paragraph in day_cell.paragraphs:
+            for run in paragraph.runs:
+                run.font.name = FontConfig.FONT_NAME
+                run.font.size = FontConfig.TABLE_CELL_SIZE
+        
+        # For merged cells, also ensure the table-level borders are properly set
+        if is_merged:
+            self._ensure_merged_cell_table_borders(day_cell)
+    
+    def _ensure_merged_cell_table_borders(self, merged_cell) -> None:
+        """Ensure table-level borders are properly set for merged cells"""
+        # Get the table that contains this cell
+        table = merged_cell._tc.getparent().getparent()
+        
+        # Get or create table properties
+        tblPr = table.tblPr
+        if tblPr is None:
+            tblPr = parse_xml(f'<w:tblPr {nsdecls("w")}/>')
+            table.insert(0, tblPr)
+        
+        # Remove any existing table borders
+        for child in tblPr:
+            if child.tag.endswith('tblBorders'):
+                tblPr.remove(child)
+        
+        # Add table-level borders that ensure merged cells respect the border rules
+        tblBorders = parse_xml(f'<w:tblBorders {nsdecls("w")}>'
+                             f'<w:top w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                             f'<w:left w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                             f'<w:bottom w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                             f'<w:right w:val="single" w:sz="{BorderWidth.THICK}" w:space="0" w:color="000000"/>'
+                             f'<w:insideH w:val="single" w:sz="{BorderWidth.THIN}" w:space="0" w:color="000000"/>'
+                             f'<w:insideV w:val="single" w:sz="{BorderWidth.THIN}" w:space="0" w:color="000000"/>'
+                             f'</w:tblBorders>')
+        tblPr.append(tblBorders)
+    
     def _apply_cell_background_color(self, tcPr, col_index: int, row_index: int) -> None:
         """Apply background color to a table cell based on its position"""
         # Day names column (except header row)
@@ -451,6 +525,54 @@ class WordGenerator:
         # Separator columns in content rows
         elif row_index > TableDimensions.HEADER_ROW_INDEX and col_index in self.separator_positions:
             self._apply_background_color(tcPr, ColorScheme.SEPARATOR_BACKGROUND)
+    
+    def _apply_table_outline_borders(self, table) -> None:
+        """Apply thick borders to the entire table outline"""
+        rows = table.rows
+        total_rows = len(rows)
+        total_cols = len(rows[0].cells) if rows else 0
+        
+        # Get the Word namespace URI
+        w_ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+        
+        for row_index, row in enumerate(rows):
+            for col_index, cell in enumerate(row.cells):
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                
+                # Check if this cell is on the table outline
+                is_top_edge = row_index == 0
+                is_bottom_edge = row_index == total_rows - 1
+                is_left_edge = col_index == 0
+                is_right_edge = col_index == total_cols - 1
+                
+                # If cell is on any edge, ensure that edge has thick border
+                if is_top_edge or is_bottom_edge or is_left_edge or is_right_edge:
+                    # Get existing borders or create new ones
+                    existing_borders = None
+                    for child in tcPr:
+                        if child.tag.endswith('tcBorders'):
+                            existing_borders = child
+                            break
+                    
+                    if existing_borders is not None:
+                        # Update existing borders for outline edges
+                        if is_top_edge:
+                            for border in existing_borders:
+                                if border.tag.endswith('top'):
+                                    border.set(f'{w_ns}sz', str(BorderWidth.THICK))
+                        if is_bottom_edge:
+                            for border in existing_borders:
+                                if border.tag.endswith('bottom'):
+                                    border.set(f'{w_ns}sz', str(BorderWidth.THICK))
+                        if is_left_edge:
+                            for border in existing_borders:
+                                if border.tag.endswith('left'):
+                                    border.set(f'{w_ns}sz', str(BorderWidth.THICK))
+                        if is_right_edge:
+                            for border in existing_borders:
+                                if border.tag.endswith('right'):
+                                    border.set(f'{w_ns}sz', str(BorderWidth.THICK))
     
     def _apply_background_color(self, tcPr, color_hex: str) -> None:
         """Apply background color to a table cell"""
