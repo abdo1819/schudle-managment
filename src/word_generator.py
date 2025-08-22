@@ -23,12 +23,26 @@ class ColumnType(Enum):
     TIME_SLOT_4 = 8
 
 
+class RowType(Enum):
+    """Enum for different row types"""
+    HEADER = 0
+    DAY_START = 1  # First row of each day (course_name)
+    DAY_MIDDLE = 2  # Middle rows of each day (location, teacher)
+    DAY_END = 3  # Last row of each day (assistant)
+
+
 class ColorScheme:
     """Color constants for the document"""
     DAYS_COLUMN = "8DB3E2"
     CATEGORIES_COLUMN = "B7DDE8"
     HEADER_BACKGROUND = "8DB3E2"
     SEPARATOR_BACKGROUND = "B7DDE8"
+
+
+class BorderWidth:
+    """Border width constants in Word units (1/8 point)"""
+    THIN = 4      # 0.5pt
+    THICK = 18    # 2.25pt
 
 
 class TableDimensions:
@@ -341,14 +355,53 @@ class WordGenerator:
                         run.font.name = 'Arial'
                         run.font.size = Pt(10)
                 
-                # Set cell borders
+                # Set cell borders with different widths based on row and column types
                 tc = cell._tc
                 tcPr = tc.get_or_add_tcPr()
+                
+                # Determine row type
+                if row_index == TableDimensions.HEADER_ROW_INDEX:
+                    row_type = RowType.HEADER
+                else:
+                    # Calculate which row within the day this is (0-3)
+                    day_row_index = (row_index - TableDimensions.CONTENT_START_ROW_INDEX) % TableDimensions.ROWS_PER_DAY
+                    if day_row_index == 0:
+                        row_type = RowType.DAY_START
+                    elif day_row_index == TableDimensions.ROWS_PER_DAY - 1:
+                        row_type = RowType.DAY_END
+                    else:
+                        row_type = RowType.DAY_MIDDLE
+                
+                # Determine border widths
+                # Vertical borders: thick for time slot columns, thin for others
+                if col_index in self.time_slot_positions:
+                    vertical_border_width = str(BorderWidth.THICK)
+                else:
+                    vertical_border_width = str(BorderWidth.THIN)
+                
+                # Horizontal borders depend on row type
+                if row_type == RowType.HEADER:
+                    # Header row - all borders thin
+                    top_border_width = str(BorderWidth.THIN)
+                    bottom_border_width = str(BorderWidth.THIN)
+                elif row_type == RowType.DAY_START:
+                    # First row of day - top border thick, bottom border thin
+                    top_border_width = str(BorderWidth.THICK)
+                    bottom_border_width = str(BorderWidth.THIN)
+                elif row_type == RowType.DAY_END:
+                    # Last row of day - top border thin, bottom border thick
+                    top_border_width = str(BorderWidth.THIN)
+                    bottom_border_width = str(BorderWidth.THICK)
+                else:  # DAY_MIDDLE
+                    # Middle rows of day - all borders thin
+                    top_border_width = str(BorderWidth.THIN)
+                    bottom_border_width = str(BorderWidth.THIN)
+                
                 tcBorders = parse_xml(f'<w:tcBorders {nsdecls("w")}>'
-                                    f'<w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
-                                    f'<w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
-                                    f'<w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
-                                    f'<w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+                                    f'<w:top w:val="single" w:sz="{top_border_width}" w:space="0" w:color="000000"/>'
+                                    f'<w:left w:val="single" w:sz="{vertical_border_width}" w:space="0" w:color="000000"/>'
+                                    f'<w:bottom w:val="single" w:sz="{bottom_border_width}" w:space="0" w:color="000000"/>'
+                                    f'<w:right w:val="single" w:sz="{vertical_border_width}" w:space="0" w:color="000000"/>'
                                     f'</w:tcBorders>')
                 tcPr.append(tcBorders)
                 
