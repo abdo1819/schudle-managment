@@ -148,7 +148,7 @@ class WordGenerator:
         header_table.rows[0].cells[1].text = "كلية الهندسة"
         
         # Second row: Department and academic year
-        header_table.rows[1].cells[0].text = f"قسم {speciality}"
+        header_table.rows[1].cells[0].text = f"قسم {speciality} - {level}"
         header_table.rows[1].cells[1].text = f"العام الدراسي 2025-2026"
         
         # Apply formatting to header
@@ -183,7 +183,7 @@ class WordGenerator:
         
         # Add footer text
         current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        footer_text = f"تم إنشاء هذا الجدول تلقائياً في {current_date} - نظام إدارة الجداول الدراسية"
+        footer_text = f"{current_date}"
         footer_run = footer_para.add_run(footer_text)
         footer_run.font.name = 'Arial'
         footer_run.font.size = Pt(10)
@@ -459,68 +459,50 @@ class WordGenerator:
         """Generate Word document with multiple tables for each specialty-level combination"""
         doc = self.create_document()
         
-        # Add document title on first page
-        title_para = doc.add_paragraph()
-        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        title_run = title_para.add_run("الجداول الدراسية")
-        title_run.font.name = 'Arial'
-        title_run.font.size = Pt(24)
-        title_run.font.bold = True
-        self._set_paragraph_rtl(title_para)
-        
-        # Add subtitle
-        subtitle_para = doc.add_paragraph()
-        subtitle_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        subtitle_run = subtitle_para.add_run("كلية الهندسة - جامعة القاهرة")
-        subtitle_run.font.name = 'Arial'
-        subtitle_run.font.size = Pt(16)
-        subtitle_run.font.bold = True
-        self._set_paragraph_rtl(subtitle_para)
-        
-        # Add academic year
-        year_para = doc.add_paragraph()
-        year_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        year_run = year_para.add_run("العام الدراسي 2025-2026")
-        year_run.font.name = 'Arial'
-        year_run.font.size = Pt(14)
-        year_run.font.bold = True
-        self._set_paragraph_rtl(year_para)
-        
-        # Add spacing
-        doc.add_paragraph()
-        
-        # Generate table for each specialty-level combination
+        # Generate table for each specialty-level combination with sections
         for i, schedule in enumerate(multi_level_schedule.schedules):
             print(f"📄 Generating table for {schedule.speciality} - {schedule.level}")
             
-            # Add page break before each table (except the first one)
+            # Create new section for each page (except the first one)
             if i > 0:
+                # Add page break
                 doc.add_page_break()
-            
-            # Add title for this specialty-level combination
-            self.add_speciality_level_title(doc, schedule.speciality, schedule.level)
+                # Create new section
+                new_section = doc.add_section()
+                # Break the link to previous section's header
+                new_section.header.is_linked_to_previous = False
+                new_section.footer.is_linked_to_previous = False
+                # Add header and footer to the new section
+                self._add_header_to_section(new_section, schedule.speciality, schedule.level)
+                self._add_footer_to_section(new_section)
+            else:
+                # First page uses the default section
+                section = doc.sections[0]
+                # Break the link to previous section's header (for first section, this ensures it's independent)
+                section.header.is_linked_to_previous = False
+                section.footer.is_linked_to_previous = False
+                self._add_header_to_section(section, schedule.speciality, schedule.level)
+                self._add_footer_to_section(section)
             
             # Create table for this combination
+            doc.add_paragraph()
             self.create_table_structure(doc, schedule.weekly_schedule)
-        
-        # Now add headers and footers to each page
-        self._add_headers_and_footers_to_pages(doc, multi_level_schedule)
         
         doc.save(output_path)
     
+
+    
+
+    
     def _add_headers_and_footers_to_pages(self, doc: Document, multi_level_schedule: MultiLevelSchedule) -> None:
-        """Add headers and footers to each page with the correct specialty-level information"""
-        # For each specialty-level schedule, add header and footer to the corresponding page
-        for i, schedule in enumerate(multi_level_schedule.schedules):
-            # Get the section for this page (first section is page 1, etc.)
-            if i < len(doc.sections):
-                section = doc.sections[i]
-                
-                # Add header for this page
-                self._add_header_to_section(section, schedule.speciality, schedule.level)
-                
-                # Add footer for this page
-                self._add_footer_to_section(section)
+        """Add headers and footers to each page with unique specialty-level information"""
+        # For now, we'll use a simpler approach - just add headers to the first section
+        # This will show the same header on all pages, but with the correct specialty and level
+        if multi_level_schedule.schedules:
+            # Use the first schedule's information for the header
+            first_schedule = multi_level_schedule.schedules[0]
+            self.add_page_header(doc, first_schedule.speciality, first_schedule.level)
+            self.add_page_footer(doc)
     
     def _add_header_to_section(self, section, speciality: str, level: str) -> None:
         """Add header to a specific section"""
@@ -553,7 +535,7 @@ class WordGenerator:
         header_table.rows[0].cells[1].text = "كلية الهندسة"
         
         # Second row: Department and academic year
-        header_table.rows[1].cells[0].text = f"قسم {speciality}"
+        header_table.rows[1].cells[0].text = f"قسم {speciality} - {level}"
         header_table.rows[1].cells[1].text = f"العام الدراسي 2025-2026"
         
         # Apply formatting to header
