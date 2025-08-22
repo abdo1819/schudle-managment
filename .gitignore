@@ -151,3 +151,4 @@ cython_debug/
 # Windows
 Thumbs.db
 empty_schedule.docx
+*.docx
