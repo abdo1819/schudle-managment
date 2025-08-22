@@ -29,7 +29,9 @@ class CSVConverter:
             reader = csv.DictReader(file)
             for row in reader:
                 try:
-                    csv_row = CSVRow(**row)
+                    # Filter out any None keys from the row
+                    cleaned_row = {k: v for k, v in row.items() if k is not None}
+                    csv_row = CSVRow(**cleaned_row)
                     rows.append(csv_row)
                 except Exception as e:
                     print(f"Error parsing row: {row}, Error: {e}")
