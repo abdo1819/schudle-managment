@@ -1,5 +1,5 @@
-from typing import List, Dict, Any
 from docx import Document
+from typing import List, Dict, Any
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -8,6 +8,18 @@ from docx.oxml.ns import nsdecls
 from .models import WeeklySchedule, ScheduleEntry, DayOfWeek, TimeSlot, DetailCategory, TableCell, MultiLevelSchedule, SpecialityLevelSchedule
 from enum import Enum
 from datetime import datetime
+import os
+
+
+# Header constants
+HEADER_UNIVERSITY_NAME = "جامعة الفيوم"
+HEADER_FACULTY_NAME = "كلية الهندسة"
+HEADER_DEPARTMENT_PREFIX = "قسم الهندسة الكهربية"
+HEADER_ACADEMIC_YEAR = "العام الجامعي 2025 - 2026"
+HEADER_SEMESTER = "الفصل الدراسي الأول"
+HEADER_DIVISION_PREFIX = "شعبة"
+HEADER_LEVEL_PREFIX = "الفرقة"
+HEADER_SCHEDULE_TEMPLATE = "شئون التعليم والطلاب نموذج الجداول الدراسية"
 
 
 class ColumnType(Enum):
@@ -51,7 +63,7 @@ class FontConfig:
     TITLE_SIZE = Pt(18)
     HEADER_SIZE = Pt(12)
     FOOTER_SIZE = Pt(10)
-    TABLE_CELL_SIZE = Pt(10)
+    TABLE_CELL_SIZE = Pt(8)
 
 
 class TableDimensions:
@@ -152,27 +164,54 @@ class WordGenerator:
             # If clearing fails, create a new header
             pass
         
-        # Add header table with width parameter
-        header_table = header.add_table(rows=2, cols=2, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
+        # Add header table with three columns: right, center, left
+        header_table = header.add_table(rows=3, cols=3, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
         header_table.style = 'Table Grid'
         header_table.autofit = False
         header_table.allow_autofit = False
         
-        # Set column widths
-        for column in header_table.columns:
+        # Set column widths (right, center, left)
+        column_widths = [2.5, 3.0, 2.5]  # in inches
+        for i, column in enumerate(header_table.columns):
             for cell in column.cells:
                 tc = cell._tc
                 tcPr = tc.get_or_add_tcPr()
-                tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(TableDimensions.AVAILABLE_WIDTH_INCHES * 720)}" w:type="dxa"/>')
+                tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(column_widths[i] * 1440)}" w:type="dxa"/>')
                 tcPr.append(tcW)
         
-        # First row: University name and logo placeholder
-        header_table.rows[0].cells[0].text = "جامعة القاهرة"
-        header_table.rows[0].cells[1].text = "كلية الهندسة"
+        # Right column (University/Faculty/Department info)
+        header_table.rows[0].cells[0].text = HEADER_UNIVERSITY_NAME
+        header_table.rows[1].cells[0].text = HEADER_FACULTY_NAME
+        header_table.rows[2].cells[0].text = f"{HEADER_DEPARTMENT_PREFIX}"
         
-        # Second row: Department and academic year
-        header_table.rows[1].cells[0].text = f"قسم {speciality} - {level}"
-        header_table.rows[1].cells[1].text = f"العام الدراسي 2025-2026"
+        # Center column (Logo and title)
+        # Add logo to the first row
+        logo_cell = header_table.rows[0].cells[1]
+        self._add_logo_to_cell(logo_cell)
+        
+        # Add title to the first row (same row as logo)
+        title_cell = header_table.rows[0].cells[1]
+        # Add title text to the same cell as logo
+        if title_cell.paragraphs[0].runs:
+            # If logo was added, add title to a new paragraph
+            title_para = title_cell.add_paragraph()
+            title_para.text = HEADER_SCHEDULE_TEMPLATE
+            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            self._set_paragraph_rtl(title_para)
+        else:
+            # If no logo, add title to first paragraph
+            title_cell.text = HEADER_SCHEDULE_TEMPLATE
+            title_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            self._set_cell_rtl(title_cell)
+        
+        # Empty second and third rows in center column
+        header_table.rows[1].cells[1].text = ""
+        header_table.rows[2].cells[1].text = ""
+        
+        # Left column (Academic details)
+        header_table.rows[0].cells[2].text = HEADER_ACADEMIC_YEAR
+        header_table.rows[1].cells[2].text = HEADER_SEMESTER
+        header_table.rows[2].cells[2].text = f"{HEADER_LEVEL_PREFIX} {level} {HEADER_DIVISION_PREFIX} {speciality}"
         
         # Apply formatting to header
         for row in header_table.rows:
@@ -187,6 +226,9 @@ class WordGenerator:
         
         # Set header table to RTL
         self._set_table_rtl(header_table)
+        
+        # Remove borders from header table to match image
+        self._remove_table_borders(header_table)
     
     def add_page_footer(self, doc: Document) -> None:
         """Add page footer with generation information"""
@@ -578,27 +620,53 @@ class WordGenerator:
         except:
             pass
         
-        # Add header table with width parameter
-        header_table = header.add_table(rows=2, cols=2, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
+        # Add header table with three columns: right, center, left
+        header_table = header.add_table(rows=3, cols=3, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
         header_table.style = 'Table Grid'
         header_table.autofit = False
         header_table.allow_autofit = False
         
-        # Set column widths
-        for column in header_table.columns:
+        # Set column widths (right, center, left)
+        column_widths = [2.5, 3.0, 2.5]  # in inches
+        for i, column in enumerate(header_table.columns):
             for cell in column.cells:
                 tc = cell._tc
                 tcPr = tc.get_or_add_tcPr()
-                tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(TableDimensions.AVAILABLE_WIDTH_INCHES * 720)}" w:type="dxa"/>')
+                tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(column_widths[i] * 1440)}" w:type="dxa"/>')
                 tcPr.append(tcW)
         
-        # First row: University name and logo placeholder
-        header_table.rows[0].cells[0].text = "جامعة القاهرة"
-        header_table.rows[0].cells[1].text = "كلية الهندسة"
+        # Right column (University/Faculty/Department info)
+        header_table.rows[0].cells[0].text = HEADER_UNIVERSITY_NAME
+        header_table.rows[1].cells[0].text = HEADER_FACULTY_NAME
+        header_table.rows[2].cells[0].text = f"{HEADER_DEPARTMENT_PREFIX}"
         
-        # Second row: Department and academic year
-        header_table.rows[1].cells[0].text = f"قسم {speciality} - {level}"
-        header_table.rows[1].cells[1].text = f"العام الدراسي 2025-2026"
+        # Center column (Logo and title)
+        # Add logo to the first row
+        logo_cell = header_table.rows[0].cells[1]
+        self._add_logo_to_cell(logo_cell)
+        
+        # Add title to the first row (same row as logo)
+        title_cell = header_table.rows[2].cells[1]
+        # Add title text to the same cell as logo
+        if title_cell.paragraphs[0].runs:
+            # If logo was added, add title to a new paragraph
+            title_para = title_cell.add_paragraph()
+            title_para.text = HEADER_SCHEDULE_TEMPLATE
+            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            self._set_paragraph_rtl(title_para)
+        else:
+            # If no logo, add title to first paragraph
+            title_cell.text = HEADER_SCHEDULE_TEMPLATE
+            title_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            self._set_cell_rtl(title_cell)
+        
+        # Empty second row in center column
+        header_table.rows[1].cells[1].text = ""
+        
+        # Left column (Academic details)
+        header_table.rows[0].cells[2].text = HEADER_ACADEMIC_YEAR
+        header_table.rows[1].cells[2].text = HEADER_SEMESTER
+        header_table.rows[2].cells[2].text = f"{HEADER_LEVEL_PREFIX} {level} {HEADER_DIVISION_PREFIX} {speciality}"
         
         # Apply formatting to header
         for row in header_table.rows:
@@ -613,6 +681,9 @@ class WordGenerator:
         
         # Set header table to RTL
         self._set_table_rtl(header_table)
+        
+        # Remove borders from header table to match image
+        self._remove_table_borders(header_table)
     
     def _add_footer_to_section(self, section) -> None:
         """Add footer to a specific section"""
@@ -640,3 +711,65 @@ class WordGenerator:
         
         # Set footer to RTL
         self._set_paragraph_rtl(footer_para)
+    
+    def _add_logo_to_cell(self, cell) -> None:
+        """Add logo image to a table cell"""
+        try:
+            # Get the path to the logo file
+            current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            logo_path = os.path.join(current_dir, "assets", "logo.png")
+            
+            # Check if logo file exists
+            if os.path.exists(logo_path):
+                # Clear any existing content in the cell
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.text = ""
+                
+                # Add the logo image to the first paragraph
+                paragraph = cell.paragraphs[0]
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                
+                # Add the image with appropriate size (smaller to match image)
+                run = paragraph.add_run()
+                run.add_picture(logo_path, width=Inches(0.98), height=Inches(0.55))
+                
+                # Set RTL for the paragraph
+                self._set_paragraph_rtl(paragraph)
+            else:
+                # If logo doesn't exist, add placeholder text
+                cell.text = "[LOGO]"
+                cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                self._set_cell_rtl(cell)
+                
+        except Exception as e:
+            # If there's any error, add placeholder text
+            cell.text = "[LOGO]"
+            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            self._set_cell_rtl(cell)
+    
+    def _remove_table_borders(self, table) -> None:
+        """Remove all borders from a table"""
+        tbl = table._tbl
+        
+        # Get or create tblPr element
+        tblPr = tbl.tblPr
+        if tblPr is None:
+            tblPr = parse_xml(f'<w:tblPr {nsdecls("w")}/>')
+            tbl.insert(0, tblPr)
+        
+        # Remove any existing tblBorders setting
+        for child in tblPr:
+            if child.tag.endswith('tblBorders'):
+                tblPr.remove(child)
+        
+        # Add no borders setting
+        tblBorders = parse_xml(f'<w:tblBorders {nsdecls("w")}>'
+                             f'<w:top w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+                             f'<w:left w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+                             f'<w:bottom w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+                             f'<w:right w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+                             f'<w:insideH w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+                             f'<w:insideV w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+                             f'</w:tblBorders>')
+        tblPr.append(tblBorders)
