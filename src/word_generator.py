@@ -150,112 +150,13 @@ class WordGenerator:
     
     def add_page_header(self, doc: Document, speciality: str, level: str) -> None:
         """Add page header with identity information"""
-        # Get the current section
         section = doc.sections[0]
-        
-        # Create header
-        header = section.header
-        
-        # Clear existing content safely
-        try:
-            for element in list(header._element):
-                header._element.remove(element)
-        except:
-            # If clearing fails, create a new header
-            pass
-        
-        # Add header table with three columns: right, center, left
-        header_table = header.add_table(rows=3, cols=3, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
-        header_table.style = 'Table Grid'
-        header_table.autofit = False
-        header_table.allow_autofit = False
-        
-        # Set column widths (right, center, left)
-        column_widths = [2.5, 3.0, 2.5]  # in inches
-        for i, column in enumerate(header_table.columns):
-            for cell in column.cells:
-                tc = cell._tc
-                tcPr = tc.get_or_add_tcPr()
-                tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(column_widths[i] * 1440)}" w:type="dxa"/>')
-                tcPr.append(tcW)
-        
-        # Right column (University/Faculty/Department info)
-        header_table.rows[0].cells[0].text = HEADER_UNIVERSITY_NAME
-        header_table.rows[1].cells[0].text = HEADER_FACULTY_NAME
-        header_table.rows[2].cells[0].text = f"{HEADER_DEPARTMENT_PREFIX}"
-        
-        # Center column (Logo and title)
-        # Add logo to the first row
-        logo_cell = header_table.rows[0].cells[1]
-        self._add_logo_to_cell(logo_cell)
-        
-        # Add title to the first row (same row as logo)
-        title_cell = header_table.rows[0].cells[1]
-        # Add title text to the same cell as logo
-        if title_cell.paragraphs[0].runs:
-            # If logo was added, add title to a new paragraph
-            title_para = title_cell.add_paragraph()
-            title_para.text = HEADER_SCHEDULE_TEMPLATE
-            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            self._set_paragraph_rtl(title_para)
-        else:
-            # If no logo, add title to first paragraph
-            title_cell.text = HEADER_SCHEDULE_TEMPLATE
-            title_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-            self._set_cell_rtl(title_cell)
-        
-        # Empty second and third rows in center column
-        header_table.rows[1].cells[1].text = ""
-        header_table.rows[2].cells[1].text = ""
-        
-        # Left column (Academic details)
-        header_table.rows[0].cells[2].text = HEADER_ACADEMIC_YEAR
-        header_table.rows[1].cells[2].text = HEADER_SEMESTER
-        header_table.rows[2].cells[2].text = f"{HEADER_LEVEL_PREFIX} {level} {HEADER_DIVISION_PREFIX} {speciality}"
-        
-        # Apply formatting to header
-        for row in header_table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    for run in paragraph.runs:
-                        run.font.name = FontConfig.FONT_NAME
-                        run.font.size = FontConfig.HEADER_SIZE
-                        run.font.bold = True
-                        self._set_paragraph_rtl(paragraph)
-        
-        # Set header table to RTL
-        self._set_table_rtl(header_table)
-        
-        # Remove borders from header table to match image
-        self._remove_table_borders(header_table)
+        self._add_header_to_section(section, speciality, level)
     
     def add_page_footer(self, doc: Document) -> None:
         """Add page footer with generation information"""
-        # Get the current section
         section = doc.sections[0]
-        
-        # Create footer
-        footer = section.footer
-        
-        # Clear existing content
-        for element in footer._element:
-            footer._element.remove(element)
-        
-        # Add footer paragraph
-        footer_para = footer.add_paragraph()
-        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # Add footer text
-        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        footer_text = f"{current_date}"
-        footer_run = footer_para.add_run(footer_text)
-        footer_run.font.name = FontConfig.FONT_NAME
-        footer_run.font.size = FontConfig.FOOTER_SIZE
-        footer_run.font.italic = True
-        
-        # Set footer to RTL
-        self._set_paragraph_rtl(footer_para)
+        self._add_footer_to_section(section)
     
     def add_speciality_level_title(self, doc: Document, speciality: str, level: str) -> None:
         """Add title for specialty and level combination"""
@@ -295,23 +196,7 @@ class WordGenerator:
         table.width = Inches(total_width_inches)
         
         # Set individual column widths using XML properties
-        for i, column in enumerate(table.columns):
-            # Get width for this column
-            width = Inches(self.column_widths[i])
-            
-            # Apply width to all cells in the column
-            for cell in column.cells:
-                tc = cell._tc
-                tcPr = tc.get_or_add_tcPr()
-                
-                # Remove any existing width setting
-                for child in tcPr:
-                    if child.tag.endswith('tcW'):
-                        tcPr.remove(child)
-                
-                # Add width property
-                tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(width.inches * 1440)}" w:type="dxa"/>')
-                tcPr.append(tcW)
+        self._set_table_column_widths(table)
         
         # Set table to RTL
         self._set_table_rtl(table)
@@ -497,6 +382,26 @@ class WordGenerator:
         shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{color_hex}"/>')
         tcPr.append(shd)
     
+    def _set_table_column_widths(self, table) -> None:
+        """Set column widths for a table"""
+        for i, column in enumerate(table.columns):
+            # Get width for this column
+            width = Inches(self.column_widths[i])
+            
+            # Apply width to all cells in the column
+            for cell in column.cells:
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                
+                # Remove any existing width setting
+                for child in tcPr:
+                    if child.tag.endswith('tcW'):
+                        tcPr.remove(child)
+                
+                # Add width property
+                tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(width.inches * 1440)}" w:type="dxa"/>')
+                tcPr.append(tcW)
+    
     def _set_table_rtl(self, table) -> None:
         """Set the entire table to RTL direction"""
         tbl = table._tbl
@@ -553,73 +458,17 @@ class WordGenerator:
         bidi = parse_xml(f'<w:bidi {nsdecls("w")}/>')
         pPr.append(bidi)
     
-    def generate_word_document(self, weekly_schedule: WeeklySchedule, output_path: str) -> None:
-        """Generate Word document from weekly schedule (backward compatibility)"""
-        doc = self.create_document()
-        self.create_table_structure(doc, weekly_schedule)
-        doc.save(output_path)
-    
-    def generate_multi_level_word_document(self, multi_level_schedule: MultiLevelSchedule, output_path: str) -> None:
-        """Generate Word document with multiple tables for each specialty-level combination"""
-        doc = self.create_document()
-        
-        # Generate table for each specialty-level combination with sections
-        for i, schedule in enumerate(multi_level_schedule.schedules):
-            print(f"📄 Generating table for {schedule.speciality} - {schedule.level}")
-            
-            # Create new section for each page (except the first one)
-            if i > 0:
-                # Add page break
-                doc.add_page_break()
-                # Create new section
-                new_section = doc.add_section()
-                # Break the link to previous section's header
-                new_section.header.is_linked_to_previous = False
-                new_section.footer.is_linked_to_previous = False
-                # Add header and footer to the new section
-                self._add_header_to_section(new_section, schedule.speciality, schedule.level)
-                self._add_footer_to_section(new_section)
-            else:
-                # First page uses the default section
-                section = doc.sections[0]
-                # Break the link to previous section's header (for first section, this ensures it's independent)
-                section.header.is_linked_to_previous = False
-                section.footer.is_linked_to_previous = False
-                self._add_header_to_section(section, schedule.speciality, schedule.level)
-                self._add_footer_to_section(section)
-            
-            # Create table for this combination
-            doc.add_paragraph()
-            self.create_table_structure(doc, schedule.weekly_schedule)
-        
-        doc.save(output_path)
-    
-
-    
-
-    
-    def _add_headers_and_footers_to_pages(self, doc: Document, multi_level_schedule: MultiLevelSchedule) -> None:
-        """Add headers and footers to each page with unique specialty-level information"""
-        # For now, we'll use a simpler approach - just add headers to the first section
-        # This will show the same header on all pages, but with the correct specialty and level
-        if multi_level_schedule.schedules:
-            # Use the first schedule's information for the header
-            first_schedule = multi_level_schedule.schedules[0]
-            self.add_page_header(doc, first_schedule.speciality, first_schedule.level)
-            self.add_page_footer(doc)
-    
-    def _add_header_to_section(self, section, speciality: str, level: str) -> None:
-        """Add header to a specific section"""
-        # Create header
-        header = section.header
-        
-        # Clear existing content safely
+    def _clear_section_content(self, section_element) -> None:
+        """Safely clear content from a section element (header/footer)"""
         try:
-            for element in list(header._element):
-                header._element.remove(element)
+            for element in list(section_element._element):
+                section_element._element.remove(element)
         except:
+            # If clearing fails, continue silently
             pass
-        
+    
+    def _create_header_table(self, header) -> Any:
+        """Create and configure header table with proper column widths"""
         # Add header table with three columns: right, center, left
         header_table = header.add_table(rows=3, cols=3, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
         header_table.style = 'Table Grid'
@@ -635,6 +484,10 @@ class WordGenerator:
                 tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(column_widths[i] * 1440)}" w:type="dxa"/>')
                 tcPr.append(tcW)
         
+        return header_table
+    
+    def _fill_header_content(self, header_table, speciality: str, level: str) -> None:
+        """Fill header table with content"""
         # Right column (University/Faculty/Department info)
         header_table.rows[0].cells[0].text = HEADER_UNIVERSITY_NAME
         header_table.rows[1].cells[0].text = HEADER_FACULTY_NAME
@@ -645,9 +498,8 @@ class WordGenerator:
         logo_cell = header_table.rows[0].cells[1]
         self._add_logo_to_cell(logo_cell)
         
-        # Add title to the first row (same row as logo)
+        # Add title to the third row (different from original logic)
         title_cell = header_table.rows[2].cells[1]
-        # Add title text to the same cell as logo
         if title_cell.paragraphs[0].runs:
             # If logo was added, add title to a new paragraph
             title_para = title_cell.add_paragraph()
@@ -667,8 +519,9 @@ class WordGenerator:
         header_table.rows[0].cells[2].text = HEADER_ACADEMIC_YEAR
         header_table.rows[1].cells[2].text = HEADER_SEMESTER
         header_table.rows[2].cells[2].text = f"{HEADER_LEVEL_PREFIX} {level} {HEADER_DIVISION_PREFIX} {speciality}"
-        
-        # Apply formatting to header
+    
+    def _apply_header_formatting(self, header_table) -> None:
+        """Apply formatting to header table"""
         for row in header_table.rows:
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
@@ -685,17 +538,30 @@ class WordGenerator:
         # Remove borders from header table to match image
         self._remove_table_borders(header_table)
     
+    def _add_header_to_section(self, section, speciality: str, level: str) -> None:
+        """Add header to a specific section"""
+        # Create header
+        header = section.header
+        
+        # Clear existing content safely
+        self._clear_section_content(header)
+        
+        # Create and configure header table
+        header_table = self._create_header_table(header)
+        
+        # Fill header content
+        self._fill_header_content(header_table, speciality, level)
+        
+        # Apply formatting
+        self._apply_header_formatting(header_table)
+    
     def _add_footer_to_section(self, section) -> None:
         """Add footer to a specific section"""
         # Create footer
         footer = section.footer
         
         # Clear existing content safely
-        try:
-            for element in list(footer._element):
-                footer._element.remove(element)
-        except:
-            pass
+        self._clear_section_content(footer)
         
         # Add footer paragraph
         footer_para = footer.add_paragraph()
@@ -773,3 +639,44 @@ class WordGenerator:
                              f'<w:insideV w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
                              f'</w:tblBorders>')
         tblPr.append(tblBorders)
+    
+    def generate_word_document(self, weekly_schedule: WeeklySchedule, output_path: str) -> None:
+        """Generate Word document from weekly schedule (backward compatibility)"""
+        doc = self.create_document()
+        self.create_table_structure(doc, weekly_schedule)
+        doc.save(output_path)
+    
+    def generate_multi_level_word_document(self, multi_level_schedule: MultiLevelSchedule, output_path: str) -> None:
+        """Generate Word document with multiple tables for each specialty-level combination"""
+        doc = self.create_document()
+        
+        # Generate table for each specialty-level combination with sections
+        for i, schedule in enumerate(multi_level_schedule.schedules):
+            print(f"📄 Generating table for {schedule.speciality} - {schedule.level}")
+            
+            # Create new section for each page (except the first one)
+            if i > 0:
+                # Add page break
+                doc.add_page_break()
+                # Create new section
+                new_section = doc.add_section()
+                # Break the link to previous section's header
+                new_section.header.is_linked_to_previous = False
+                new_section.footer.is_linked_to_previous = False
+                # Add header and footer to the new section
+                self._add_header_to_section(new_section, schedule.speciality, schedule.level)
+                self._add_footer_to_section(new_section)
+            else:
+                # First page uses the default section
+                section = doc.sections[0]
+                # Break the link to previous section's header (for first section, this ensures it's independent)
+                section.header.is_linked_to_previous = False
+                section.footer.is_linked_to_previous = False
+                self._add_header_to_section(section, schedule.speciality, schedule.level)
+                self._add_footer_to_section(section)
+            
+            # Create table for this combination
+            doc.add_paragraph()
+            self.create_table_structure(doc, schedule.weekly_schedule)
+        
+        doc.save(output_path)
