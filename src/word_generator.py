@@ -5,8 +5,9 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
-from .models import WeeklySchedule, ScheduleEntry, DayOfWeek, TimeSlot, DetailCategory, TableCell
+from .models import WeeklySchedule, ScheduleEntry, DayOfWeek, TimeSlot, DetailCategory, TableCell, MultiLevelSchedule, SpecialityLevelSchedule
 from enum import Enum
+from datetime import datetime
 
 
 class ColumnType(Enum):
@@ -111,6 +112,107 @@ class WordGenerator:
             section.right_margin = Inches(TableDimensions.MARGIN_INCHES)
         
         return doc
+    
+    def add_page_header(self, doc: Document, speciality: str, level: str) -> None:
+        """Add page header with identity information"""
+        # Get the current section
+        section = doc.sections[0]
+        
+        # Create header
+        header = section.header
+        
+        # Clear existing content safely
+        try:
+            for element in list(header._element):
+                header._element.remove(element)
+        except:
+            # If clearing fails, create a new header
+            pass
+        
+        # Add header table with width parameter
+        header_table = header.add_table(rows=2, cols=2, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
+        header_table.style = 'Table Grid'
+        header_table.autofit = False
+        header_table.allow_autofit = False
+        
+        # Set column widths
+        for column in header_table.columns:
+            for cell in column.cells:
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(TableDimensions.AVAILABLE_WIDTH_INCHES * 720)}" w:type="dxa"/>')
+                tcPr.append(tcW)
+        
+        # First row: University name and logo placeholder
+        header_table.rows[0].cells[0].text = "جامعة القاهرة"
+        header_table.rows[0].cells[1].text = "كلية الهندسة"
+        
+        # Second row: Department and academic year
+        header_table.rows[1].cells[0].text = f"قسم {speciality}"
+        header_table.rows[1].cells[1].text = f"العام الدراسي 2025-2026"
+        
+        # Apply formatting to header
+        for row in header_table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    for run in paragraph.runs:
+                        run.font.name = 'Arial'
+                        run.font.size = Pt(12)
+                        run.font.bold = True
+                        self._set_paragraph_rtl(paragraph)
+        
+        # Set header table to RTL
+        self._set_table_rtl(header_table)
+    
+    def add_page_footer(self, doc: Document) -> None:
+        """Add page footer with generation information"""
+        # Get the current section
+        section = doc.sections[0]
+        
+        # Create footer
+        footer = section.footer
+        
+        # Clear existing content
+        for element in footer._element:
+            footer._element.remove(element)
+        
+        # Add footer paragraph
+        footer_para = footer.add_paragraph()
+        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Add footer text
+        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        footer_text = f"تم إنشاء هذا الجدول تلقائياً في {current_date} - نظام إدارة الجداول الدراسية"
+        footer_run = footer_para.add_run(footer_text)
+        footer_run.font.name = 'Arial'
+        footer_run.font.size = Pt(10)
+        footer_run.font.italic = True
+        
+        # Set footer to RTL
+        self._set_paragraph_rtl(footer_para)
+    
+    def add_speciality_level_title(self, doc: Document, speciality: str, level: str) -> None:
+        """Add title for specialty and level combination"""
+        # Add spacing before title
+        doc.add_paragraph()
+        
+        # Create title paragraph
+        title_para = doc.add_paragraph()
+        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Add title text
+        title_text = f"جدول {speciality} - {level}"
+        title_run = title_para.add_run(title_text)
+        title_run.font.name = 'Arial'
+        title_run.font.size = Pt(18)
+        title_run.font.bold = True
+        
+        # Set title to RTL
+        self._set_paragraph_rtl(title_para)
+        
+        # Add spacing after title
+        doc.add_paragraph()
     
     def create_table_structure(self, doc: Document, weekly_schedule: WeeklySchedule) -> None:
         """Create the main table structure"""
@@ -326,25 +428,171 @@ class WordGenerator:
         
         # Set paragraph direction to RTL
         for paragraph in cell.paragraphs:
-            p = paragraph._p
-            
-            # Get or create pPr element
-            pPr = p.pPr
-            if pPr is None:
-                pPr = parse_xml(f'<w:pPr {nsdecls("w")}/>')
-                p.insert(0, pPr)
-            
-            # Remove any existing bidi setting
-            for child in pPr:
-                if child.tag.endswith('bidi'):
-                    pPr.remove(child)
-            
-            # Add RTL paragraph direction
-            bidi = parse_xml(f'<w:bidi {nsdecls("w")}/>')
-            pPr.append(bidi)
+            self._set_paragraph_rtl(paragraph)
+    
+    def _set_paragraph_rtl(self, paragraph) -> None:
+        """Set a paragraph to RTL direction"""
+        p = paragraph._p
+        
+        # Get or create pPr element
+        pPr = p.pPr
+        if pPr is None:
+            pPr = parse_xml(f'<w:pPr {nsdecls("w")}/>')
+            p.insert(0, pPr)
+        
+        # Remove any existing bidi setting
+        for child in pPr:
+            if child.tag.endswith('bidi'):
+                pPr.remove(child)
+        
+        # Add RTL paragraph direction
+        bidi = parse_xml(f'<w:bidi {nsdecls("w")}/>')
+        pPr.append(bidi)
     
     def generate_word_document(self, weekly_schedule: WeeklySchedule, output_path: str) -> None:
-        """Generate Word document from weekly schedule"""
+        """Generate Word document from weekly schedule (backward compatibility)"""
         doc = self.create_document()
         self.create_table_structure(doc, weekly_schedule)
         doc.save(output_path)
+    
+    def generate_multi_level_word_document(self, multi_level_schedule: MultiLevelSchedule, output_path: str) -> None:
+        """Generate Word document with multiple tables for each specialty-level combination"""
+        doc = self.create_document()
+        
+        # Add document title on first page
+        title_para = doc.add_paragraph()
+        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        title_run = title_para.add_run("الجداول الدراسية")
+        title_run.font.name = 'Arial'
+        title_run.font.size = Pt(24)
+        title_run.font.bold = True
+        self._set_paragraph_rtl(title_para)
+        
+        # Add subtitle
+        subtitle_para = doc.add_paragraph()
+        subtitle_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        subtitle_run = subtitle_para.add_run("كلية الهندسة - جامعة القاهرة")
+        subtitle_run.font.name = 'Arial'
+        subtitle_run.font.size = Pt(16)
+        subtitle_run.font.bold = True
+        self._set_paragraph_rtl(subtitle_para)
+        
+        # Add academic year
+        year_para = doc.add_paragraph()
+        year_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        year_run = year_para.add_run("العام الدراسي 2025-2026")
+        year_run.font.name = 'Arial'
+        year_run.font.size = Pt(14)
+        year_run.font.bold = True
+        self._set_paragraph_rtl(year_para)
+        
+        # Add spacing
+        doc.add_paragraph()
+        
+        # Generate table for each specialty-level combination
+        for i, schedule in enumerate(multi_level_schedule.schedules):
+            print(f"📄 Generating table for {schedule.speciality} - {schedule.level}")
+            
+            # Add page break before each table (except the first one)
+            if i > 0:
+                doc.add_page_break()
+            
+            # Add title for this specialty-level combination
+            self.add_speciality_level_title(doc, schedule.speciality, schedule.level)
+            
+            # Create table for this combination
+            self.create_table_structure(doc, schedule.weekly_schedule)
+        
+        # Now add headers and footers to each page
+        self._add_headers_and_footers_to_pages(doc, multi_level_schedule)
+        
+        doc.save(output_path)
+    
+    def _add_headers_and_footers_to_pages(self, doc: Document, multi_level_schedule: MultiLevelSchedule) -> None:
+        """Add headers and footers to each page with the correct specialty-level information"""
+        # For each specialty-level schedule, add header and footer to the corresponding page
+        for i, schedule in enumerate(multi_level_schedule.schedules):
+            # Get the section for this page (first section is page 1, etc.)
+            if i < len(doc.sections):
+                section = doc.sections[i]
+                
+                # Add header for this page
+                self._add_header_to_section(section, schedule.speciality, schedule.level)
+                
+                # Add footer for this page
+                self._add_footer_to_section(section)
+    
+    def _add_header_to_section(self, section, speciality: str, level: str) -> None:
+        """Add header to a specific section"""
+        # Create header
+        header = section.header
+        
+        # Clear existing content safely
+        try:
+            for element in list(header._element):
+                header._element.remove(element)
+        except:
+            pass
+        
+        # Add header table with width parameter
+        header_table = header.add_table(rows=2, cols=2, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
+        header_table.style = 'Table Grid'
+        header_table.autofit = False
+        header_table.allow_autofit = False
+        
+        # Set column widths
+        for column in header_table.columns:
+            for cell in column.cells:
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(TableDimensions.AVAILABLE_WIDTH_INCHES * 720)}" w:type="dxa"/>')
+                tcPr.append(tcW)
+        
+        # First row: University name and logo placeholder
+        header_table.rows[0].cells[0].text = "جامعة القاهرة"
+        header_table.rows[0].cells[1].text = "كلية الهندسة"
+        
+        # Second row: Department and academic year
+        header_table.rows[1].cells[0].text = f"قسم {speciality}"
+        header_table.rows[1].cells[1].text = f"العام الدراسي 2025-2026"
+        
+        # Apply formatting to header
+        for row in header_table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    for run in paragraph.runs:
+                        run.font.name = 'Arial'
+                        run.font.size = Pt(12)
+                        run.font.bold = True
+                        self._set_paragraph_rtl(paragraph)
+        
+        # Set header table to RTL
+        self._set_table_rtl(header_table)
+    
+    def _add_footer_to_section(self, section) -> None:
+        """Add footer to a specific section"""
+        # Create footer
+        footer = section.footer
+        
+        # Clear existing content safely
+        try:
+            for element in list(footer._element):
+                footer._element.remove(element)
+        except:
+            pass
+        
+        # Add footer paragraph
+        footer_para = footer.add_paragraph()
+        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Add footer text
+        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        footer_text = f"تم إنشاء هذا الجدول تلقائياً في {current_date} - نظام إدارة الجداول الدراسية"
+        footer_run = footer_para.add_run(footer_text)
+        footer_run.font.name = 'Arial'
+        footer_run.font.size = Pt(10)
+        footer_run.font.italic = True
+        
+        # Set footer to RTL
+        self._set_paragraph_rtl(footer_para)

@@ -1,10 +1,11 @@
 import csv
+import pandas as pd
 from typing import List, Dict, Any
-from .models import CSVRow, ScheduleEntry, DaySchedule, WeeklySchedule, DayOfWeek
+from .models import CSVRow, ScheduleEntry, DaySchedule, WeeklySchedule, DayOfWeek, SpecialityLevelSchedule, MultiLevelSchedule
 
 
 class CSVConverter:
-    """Converts CSV data to structured JSON format"""
+    """Converts CSV/Excel data to structured JSON format"""
     
     def __init__(self):
         self.day_mapping = {
@@ -25,25 +26,97 @@ class CSVConverter:
     def read_csv(self, file_path: str) -> List[CSVRow]:
         """Read CSV file and convert to list of CSVRow objects"""
         rows = []
+        ignored_rows = []
+        
         with open(file_path, 'r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             for row in reader:
                 try:
                     # Filter out any None keys from the row
                     cleaned_row = {k: v for k, v in row.items() if k is not None}
+                    
+                    # Check if code is None/empty - if so, ignore this row
+                    if not cleaned_row.get('code'):
+                        ignored_rows.append(row)
+                        print(f"⚠️  Ignoring row with empty code: {row}")
+                        continue
+                    
                     csv_row = CSVRow(**cleaned_row)
                     rows.append(csv_row)
                 except Exception as e:
                     print(f"Error parsing row: {row}, Error: {e}")
+                    ignored_rows.append(row)
+        
+        if ignored_rows:
+            print(f"📊 Total rows ignored: {len(ignored_rows)}")
+        
         return rows
+    
+    def read_excel(self, file_path: str) -> List[CSVRow]:
+        """Read Excel file from 'table_full' sheet and convert to list of CSVRow objects"""
+        try:
+            # Read the 'table_full' sheet
+            df = pd.read_excel(file_path, sheet_name='table_full')
+            
+            # Convert DataFrame to list of dictionaries
+            rows_data = df.to_dict('records')
+            
+            rows = []
+            ignored_rows = []
+            
+            for row_data in rows_data:
+                try:
+                    # Filter out any None keys and convert NaN to None
+                    cleaned_row = {}
+                    for k, v in row_data.items():
+                        if k is not None:
+                            # Convert pandas NaN to None
+                            if pd.isna(v):
+                                cleaned_row[k] = None
+                            else:
+                                # Convert to string, but handle None values properly
+                                if v is not None:
+                                    cleaned_row[k] = str(v)
+                                else:
+                                    cleaned_row[k] = None
+                    
+                    # Check if code is None/NaN - if so, ignore this row
+                    if cleaned_row.get('code') is None:
+                        ignored_rows.append(row_data)
+                        print(f"⚠️  Ignoring row with NaN code: {row_data}")
+                        continue
+                    
+                    csv_row = CSVRow(**cleaned_row)
+                    rows.append(csv_row)
+                except Exception as e:
+                    print(f"Error parsing row: {row_data}, Error: {e}")
+                    ignored_rows.append(row_data)
+                    # Continue processing other rows instead of failing completely
+                    continue
+            
+            if ignored_rows:
+                print(f"📊 Total rows ignored: {len(ignored_rows)}")
+            
+            return rows
+            
+        except Exception as e:
+            print(f"Error reading Excel file: {e}")
+            return []
+    
+    def read_file(self, file_path: str) -> List[CSVRow]:
+        """Read file (CSV or Excel) and convert to list of CSVRow objects"""
+        if file_path.lower().endswith(('.xlsx', '.xls')):
+            return self.read_excel(file_path)
+        else:
+            return self.read_csv(file_path)
     
     def create_schedule_entry(self, csv_row: CSVRow) -> ScheduleEntry:
         """Create ScheduleEntry from CSVRow"""
         return ScheduleEntry(
-            course_name=csv_row.course_name,
+            course_name=csv_row.course_name or "",  # Use empty string if None
             location=csv_row.location,
-            instructor=csv_row.main_tutor,
-            assistant=csv_row.helping_stuff
+            instructor=csv_row.main_tutor or "",  # Use empty string if None
+            assistant=csv_row.helping_stuff or ""  # Use empty string if None
         )
     
     def create_empty_day_schedule(self) -> DaySchedule:
@@ -54,6 +127,22 @@ class CSVConverter:
             third=None,
             fourth=None
         )
+    
+    def group_rows_by_speciality_level(self, csv_rows: List[CSVRow]) -> Dict[tuple[str, str], List[CSVRow]]:
+        """Group CSV rows by specialty and level combination"""
+        grouped_rows = {}
+        
+        for csv_row in csv_rows:
+            # Use speciality and level, with fallbacks for missing values
+            speciality = csv_row.speciality or csv_row.specialy_level or "عام"
+            level = csv_row.level or "عام"
+            
+            key = (speciality, level)
+            if key not in grouped_rows:
+                grouped_rows[key] = []
+            grouped_rows[key].append(csv_row)
+        
+        return grouped_rows
     
     def convert_to_weekly_schedule(self, csv_rows: List[CSVRow]) -> WeeklySchedule:
         """Convert CSV rows to structured weekly schedule"""
@@ -77,7 +166,36 @@ class CSVConverter:
         
         return weekly_schedule
     
-    def convert_csv_to_json(self, file_path: str) -> WeeklySchedule:
-        """Main method to convert CSV file to JSON structure"""
-        csv_rows = self.read_csv(file_path)
+    def convert_to_multi_level_schedule(self, csv_rows: List[CSVRow]) -> MultiLevelSchedule:
+        """Convert CSV rows to multi-level schedule with separate schedules for each specialty-level combination"""
+        # Group rows by specialty and level
+        grouped_rows = self.group_rows_by_speciality_level(csv_rows)
+        
+        schedules = []
+        
+        for (speciality, level), rows in grouped_rows.items():
+            print(f"📋 Processing {speciality} - {level}: {len(rows)} entries")
+            
+            # Convert rows for this specialty-level combination to weekly schedule
+            weekly_schedule = self.convert_to_weekly_schedule(rows)
+            
+            # Create SpecialityLevelSchedule
+            speciality_level_schedule = SpecialityLevelSchedule(
+                speciality=speciality,
+                level=level,
+                weekly_schedule=weekly_schedule
+            )
+            
+            schedules.append(speciality_level_schedule)
+        
+        return MultiLevelSchedule(schedules=schedules)
+    
+    def convert_file_to_json(self, file_path: str) -> WeeklySchedule:
+        """Main method to convert CSV/Excel file to JSON structure (backward compatibility)"""
+        csv_rows = self.read_file(file_path)
         return self.convert_to_weekly_schedule(csv_rows)
+    
+    def convert_file_to_multi_level_json(self, file_path: str) -> MultiLevelSchedule:
+        """Main method to convert CSV/Excel file to multi-level JSON structure"""
+        csv_rows = self.read_file(file_path)
+        return self.convert_to_multi_level_schedule(csv_rows)

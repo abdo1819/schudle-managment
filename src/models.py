@@ -29,29 +29,35 @@ class DetailCategory(str, Enum):
 
 
 class CSVRow(BaseModel):
-    """Model for CSV row data"""
+    """Model for Excel/CSV row data"""
+    is_valid: Optional[str] = None
     day: str
     slot: int
     code: str
+    speciality: Optional[str] = None
     activity_type: str = Field(alias="activityType")
     location: str
-    course_name: str = Field(alias="course_name")
+    active_tutor: Optional[str] = None
+    level: Optional[str] = None
+    course_name: Optional[str] = Field(alias="course_name", default=None)
     day_slot: str = Field(alias="day_slot")
+    specialy_level: Optional[str] = None
     time: str
     day_order: int = Field(alias="day_order")
     confirmed_by_tutor: Optional[str] = Field(alias="confirmed by tutor", default=None)
     teaching_hours: Optional[str] = Field(alias="teaching_hours", default=None)
     teaching_hours_printable: Optional[str] = Field(alias="teachin_hourse_printalble", default=None)
-    main_tutor: str = Field(alias="main_tutor")
-    helping_stuff: str = Field(alias="helping_stuff")
+    sp_code: Optional[str] = None
+    main_tutor: Optional[str] = Field(alias="main_tutor", default=None)
+    helping_stuff: Optional[str] = Field(alias="helping_stuff", default=None)
 
 
 class ScheduleEntry(BaseModel):
     """Model for a single schedule entry"""
-    course_name: str
+    course_name: Optional[str] = None
     location: str
-    instructor: str
-    assistant: str
+    instructor: Optional[str] = None
+    assistant: Optional[str] = None
 
 
 class DaySchedule(TypedDict):
@@ -69,6 +75,29 @@ class WeeklySchedule(TypedDict):
     tuesday: DaySchedule
     wednesday: DaySchedule
     thursday: DaySchedule
+
+
+class SpecialityLevelSchedule(BaseModel):
+    """Schedule for a specific specialty and level combination"""
+    speciality: str
+    level: str
+    weekly_schedule: WeeklySchedule
+
+
+class MultiLevelSchedule(BaseModel):
+    """Complete multi-level schedule with all specialty-level combinations"""
+    schedules: List[SpecialityLevelSchedule]
+    
+    def get_speciality_levels(self) -> List[tuple[str, str]]:
+        """Get list of all specialty-level combinations"""
+        return [(schedule.speciality, schedule.level) for schedule in self.schedules]
+    
+    def get_schedule_by_speciality_level(self, speciality: str, level: str) -> Optional[WeeklySchedule]:
+        """Get weekly schedule for specific specialty and level"""
+        for schedule in self.schedules:
+            if schedule.speciality == speciality and schedule.level == level:
+                return schedule.weekly_schedule
+        return None
 
 
 class TableCell(BaseModel):
