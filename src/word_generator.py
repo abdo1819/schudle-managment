@@ -45,6 +45,15 @@ class BorderWidth:
     THICK = 18    # 2.25pt
 
 
+class FontConfig:
+    """Font configuration constants"""
+    FONT_NAME = 'Arial'
+    TITLE_SIZE = Pt(18)
+    HEADER_SIZE = Pt(12)
+    FOOTER_SIZE = Pt(10)
+    TABLE_CELL_SIZE = Pt(10)
+
+
 class TableDimensions:
     """Table dimension constants"""
     # Page dimensions
@@ -171,8 +180,8 @@ class WordGenerator:
                 for paragraph in cell.paragraphs:
                     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     for run in paragraph.runs:
-                        run.font.name = 'Arial'
-                        run.font.size = Pt(12)
+                        run.font.name = FontConfig.FONT_NAME
+                        run.font.size = FontConfig.HEADER_SIZE
                         run.font.bold = True
                         self._set_paragraph_rtl(paragraph)
         
@@ -199,8 +208,8 @@ class WordGenerator:
         current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         footer_text = f"{current_date}"
         footer_run = footer_para.add_run(footer_text)
-        footer_run.font.name = 'Arial'
-        footer_run.font.size = Pt(10)
+        footer_run.font.name = FontConfig.FONT_NAME
+        footer_run.font.size = FontConfig.FOOTER_SIZE
         footer_run.font.italic = True
         
         # Set footer to RTL
@@ -218,8 +227,8 @@ class WordGenerator:
         # Add title text
         title_text = f"جدول {speciality} - {level}"
         title_run = title_para.add_run(title_text)
-        title_run.font.name = 'Arial'
-        title_run.font.size = Pt(18)
+        title_run.font.name = FontConfig.FONT_NAME
+        title_run.font.size = FontConfig.TITLE_SIZE
         title_run.font.bold = True
         
         # Set title to RTL
@@ -352,8 +361,8 @@ class WordGenerator:
                 # Set font
                 for paragraph in cell.paragraphs:
                     for run in paragraph.runs:
-                        run.font.name = 'Arial'
-                        run.font.size = Pt(10)
+                        run.font.name = FontConfig.FONT_NAME
+                        run.font.size = FontConfig.TABLE_CELL_SIZE
                 
                 # Set cell borders with different widths based on row and column types
                 tc = cell._tc
@@ -597,8 +606,8 @@ class WordGenerator:
                 for paragraph in cell.paragraphs:
                     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     for run in paragraph.runs:
-                        run.font.name = 'Arial'
-                        run.font.size = Pt(12)
+                        run.font.name = FontConfig.FONT_NAME
+                        run.font.size = FontConfig.HEADER_SIZE
                         run.font.bold = True
                         self._set_paragraph_rtl(paragraph)
         
@@ -625,8 +634,8 @@ class WordGenerator:
         current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         footer_text = f"تم إنشاء هذا الجدول تلقائياً في {current_date} - نظام إدارة الجداول الدراسية"
         footer_run = footer_para.add_run(footer_text)
-        footer_run.font.name = 'Arial'
-        footer_run.font.size = Pt(10)
+        footer_run.font.name = FontConfig.FONT_NAME
+        footer_run.font.size = FontConfig.FOOTER_SIZE
         footer_run.font.italic = True
         
         # Set footer to RTL
