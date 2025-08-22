@@ -9,10 +9,10 @@ class CSVConverter:
     
     def __init__(self):
         self.day_mapping = {
-            "الأحد": "sunday",
+            "الاحد": "sunday",
             "الاثنين": "monday", 
             "الثلاثاء": "tuesday",
-            "الأربعاء": "wednesday",
+            "الاربعاء": "wednesday",
             "الخميس": "thursday"
         }
         

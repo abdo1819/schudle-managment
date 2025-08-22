@@ -93,8 +93,8 @@ class TableDimensions:
     # Column widths (in inches)
     DAYS_COLUMN_WIDTH = 0.8
     CATEGORIES_COLUMN_WIDTH = 1.0
-    TIME_SLOT_WIDTH = 0.6
-    TIME_SLOT_HALF_WIDTH = 0.6  # Half width for half slots
+    TIME_SLOT_WIDTH = 1.0
+    TIME_SLOT_HALF_WIDTH = 0.2  # Half width for half slots
     SEPARATOR_WIDTH = 0.2
     
     # Row structure
