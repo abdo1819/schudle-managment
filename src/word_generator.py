@@ -6,6 +6,51 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
 from .models import WeeklySchedule, ScheduleEntry, DayOfWeek, TimeSlot, DetailCategory, TableCell
+from enum import Enum
+
+
+class ColumnType(Enum):
+    """Enum for different column types"""
+    DAYS = 0
+    CATEGORIES = 1
+    TIME_SLOT_1 = 2
+    SEPARATOR_1 = 3
+    TIME_SLOT_2 = 4
+    SEPARATOR_2 = 5
+    TIME_SLOT_3 = 6
+    SEPARATOR_3 = 7
+    TIME_SLOT_4 = 8
+
+
+class ColorScheme:
+    """Color constants for the document"""
+    DAYS_COLUMN = "8DB3E2"
+    CATEGORIES_COLUMN = "B7DDE8"
+    HEADER_BACKGROUND = "8DB3E2"
+    SEPARATOR_BACKGROUND = "B7DDE8"
+
+
+class TableDimensions:
+    """Table dimension constants"""
+    # Page dimensions
+    A4_WIDTH_INCHES = 8.27
+    MARGIN_INCHES = 0.5
+    AVAILABLE_WIDTH_INCHES = A4_WIDTH_INCHES - (2 * MARGIN_INCHES)
+    
+    # Table structure
+    TOTAL_ROWS = 21  # 5 days * 4 categories + 1 header
+    TOTAL_COLUMNS = 9  # 6 data columns + 3 separators
+    
+    # Column widths (in inches)
+    DAYS_COLUMN_WIDTH = 0.8
+    CATEGORIES_COLUMN_WIDTH = 1.0
+    TIME_SLOT_WIDTH = 1.2
+    SEPARATOR_WIDTH = 0.2
+    
+    # Row structure
+    HEADER_ROW_INDEX = 0
+    CONTENT_START_ROW_INDEX = 1
+    ROWS_PER_DAY = 4  # 4 categories per day
 
 
 class WordGenerator:
@@ -25,6 +70,33 @@ class WordGenerator:
             "المحاضرة الثالثة 12.20 - 1.50",
             "المحاضرة الرابعة 2.00 - 3.30"
         ]
+        
+        # Define column positions for better readability
+        self.time_slot_positions = [
+            ColumnType.TIME_SLOT_1.value,
+            ColumnType.TIME_SLOT_2.value,
+            ColumnType.TIME_SLOT_3.value,
+            ColumnType.TIME_SLOT_4.value
+        ]
+        self.separator_positions = [
+            ColumnType.SEPARATOR_1.value,
+            ColumnType.SEPARATOR_2.value,
+            ColumnType.SEPARATOR_3.value
+        ]
+        self.slot_keys = ["first", "second", "third", "fourth"]
+        
+        # Column width mapping
+        self.column_widths = {
+            ColumnType.DAYS.value: TableDimensions.DAYS_COLUMN_WIDTH,
+            ColumnType.CATEGORIES.value: TableDimensions.CATEGORIES_COLUMN_WIDTH,
+            ColumnType.TIME_SLOT_1.value: TableDimensions.TIME_SLOT_WIDTH,
+            ColumnType.SEPARATOR_1.value: TableDimensions.SEPARATOR_WIDTH,
+            ColumnType.TIME_SLOT_2.value: TableDimensions.TIME_SLOT_WIDTH,
+            ColumnType.SEPARATOR_2.value: TableDimensions.SEPARATOR_WIDTH,
+            ColumnType.TIME_SLOT_3.value: TableDimensions.TIME_SLOT_WIDTH,
+            ColumnType.SEPARATOR_3.value: TableDimensions.SEPARATOR_WIDTH,
+            ColumnType.TIME_SLOT_4.value: TableDimensions.TIME_SLOT_WIDTH
+        }
     
     def create_document(self) -> Document:
         """Create a new Word document"""
@@ -33,17 +105,17 @@ class WordGenerator:
         # Set document margins
         sections = doc.sections
         for section in sections:
-            section.top_margin = Inches(0.5)
-            section.bottom_margin = Inches(0.5)
-            section.left_margin = Inches(0.5)
-            section.right_margin = Inches(0.5)
+            section.top_margin = Inches(TableDimensions.MARGIN_INCHES)
+            section.bottom_margin = Inches(TableDimensions.MARGIN_INCHES)
+            section.left_margin = Inches(TableDimensions.MARGIN_INCHES)
+            section.right_margin = Inches(TableDimensions.MARGIN_INCHES)
         
         return doc
     
     def create_table_structure(self, doc: Document, weekly_schedule: WeeklySchedule) -> None:
         """Create the main table structure"""
-        # Create table: 21 rows (5 days * 4 categories + 1 header) x 9 columns (6 data + 3 separators)
-        table = doc.add_table(rows=21, cols=9)
+        # Create table with defined dimensions
+        table = doc.add_table(rows=TableDimensions.TOTAL_ROWS, cols=TableDimensions.TOTAL_COLUMNS)
         table.style = 'Table Grid'
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         
@@ -51,31 +123,14 @@ class WordGenerator:
         table.autofit = False
         table.allow_autofit = False
         
-        # A4 page width is 8.27 inches, accounting for margins (0.5 inch each side) = 7.27 inches available
-        # Calculate proportional widths to fit within A4
-        available_width = 7.27  # inches
-        
-        # Define column widths that add up to available width
-        column_widths = {
-            0: 0.8,   # Days column
-            1: 1.0,   # Categories column  
-            2: 1.2,   # Time slot 1
-            3: 0.2,  # Separator 1
-            4: 1.2,   # Time slot 2
-            5: 0.2,  # Separator 2
-            6: 1.2,   # Time slot 3
-            7: 0.2,  # Separator 3
-            8: 1.2    # Time slot 4
-        }
-        
-        # Verify total width
-        total_width_inches = sum(column_widths.values())
+        # Calculate total width from column definitions
+        total_width_inches = sum(self.column_widths.values())
         table.width = Inches(total_width_inches)
         
         # Set individual column widths using XML properties
         for i, column in enumerate(table.columns):
             # Get width for this column
-            width = Inches(column_widths[i])
+            width = Inches(self.column_widths[i])
             
             # Apply width to all cells in the column
             for cell in column.cells:
@@ -97,27 +152,24 @@ class WordGenerator:
     
     def _fill_header_row(self, table) -> None:
         """Fill the header row with time slots"""
-        header_row = table.rows[0]
+        header_row = table.rows[TableDimensions.HEADER_ROW_INDEX]
         
         # First two cells are empty in header
-        header_row.cells[0].text = ""
-        header_row.cells[1].text = ""
+        header_row.cells[ColumnType.DAYS.value].text = ""
+        header_row.cells[ColumnType.CATEGORIES.value].text = ""
         
         # Fill each time slot in separate columns with separators
-        time_slot_positions = [2, 4, 6, 8]  # Positions for time slots
-        separator_positions = [3, 5, 7]     # Positions for separators
-        
         for i, time_slot in enumerate(self.time_slots):
-            header_row.cells[time_slot_positions[i]].text = time_slot
-            header_row.cells[time_slot_positions[i]].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            header_row.cells[self.time_slot_positions[i]].text = time_slot
+            header_row.cells[self.time_slot_positions[i]].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         # Set separator columns to empty
-        for pos in separator_positions:
+        for pos in self.separator_positions:
             header_row.cells[pos].text = ""
     
     def _fill_content_rows(self, table, weekly_schedule: WeeklySchedule) -> None:
         """Fill the content rows with schedule data"""
-        row_index = 1
+        row_index = TableDimensions.CONTENT_START_ROW_INDEX
         
         for day_index, day_arabic in enumerate(self.days_arabic):
             day_key = list(weekly_schedule.keys())[day_index]
@@ -129,23 +181,19 @@ class WordGenerator:
                 
                 # Day column (merged vertically for each day)
                 if category_index == 0:
-                    row.cells[0].text = day_arabic
-                    row.cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    row.cells[ColumnType.DAYS.value].text = day_arabic
+                    row.cells[ColumnType.DAYS.value].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
                     # Merge vertically with next 3 rows
                     if row_index + 3 < len(table.rows):
-                        row.cells[0].merge(table.rows[row_index + 3].cells[0])
+                        row.cells[ColumnType.DAYS.value].merge(table.rows[row_index + 3].cells[ColumnType.DAYS.value])
                 
                 # Category column
-                row.cells[1].text = category
-                row.cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                row.cells[ColumnType.CATEGORIES.value].text = category
+                row.cells[ColumnType.CATEGORIES.value].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 
                 # Time slot columns with separators
-                slot_keys = ["first", "second", "third", "fourth"]
-                time_slot_positions = [2, 4, 6, 8]  # Positions for time slots
-                separator_positions = [3, 5, 7]     # Positions for separators
-                
-                for slot_index, slot_key in enumerate(slot_keys):
-                    cell = row.cells[time_slot_positions[slot_index]]
+                for slot_index, slot_key in enumerate(self.slot_keys):
+                    cell = row.cells[self.time_slot_positions[slot_index]]
                     schedule_entry = day_schedule[slot_key]
                     
                     if schedule_entry:
@@ -161,7 +209,7 @@ class WordGenerator:
                         cell.text = ""
                 
                 # Set separator columns to empty
-                for pos in separator_positions:
+                for pos in self.separator_positions:
                     row.cells[pos].text = ""
                 
                 row_index += 1
@@ -188,26 +236,30 @@ class WordGenerator:
                                     f'</w:tcBorders>')
                 tcPr.append(tcBorders)
                 
-                # Apply background colors
-                # Day names column (column 0) - #8DB3E2 (except header row)
-                if col_index == 0 and row_index > 0:
-                    self._apply_background_color(tcPr, "8DB3E2")
-                
-                # Detail categories column (column 1) - #B7DDE8 (except header row)
-                elif col_index == 1 and row_index > 0:
-                    self._apply_background_color(tcPr, "B7DDE8")
-                
-                # Time slots in header row (columns 2, 4, 6, 8) - #8DB3E2
-                elif row_index == 0 and col_index in [2, 4, 6, 8]:
-                    self._apply_background_color(tcPr, "8DB3E2")
-                
-                # Separator columns in header row (columns 3, 5, 7) - #8DB3E2
-                elif row_index == 0 and col_index in [3, 5, 7]:
-                    self._apply_background_color(tcPr, "8DB3E2")
-                
-                # Separator columns in content rows (columns 3, 5, 7) - #B7DDE8
-                elif row_index > 0 and col_index in [3, 5, 7]:
-                    self._apply_background_color(tcPr, "B7DDE8")
+                # Apply background colors based on column type and row position
+                self._apply_cell_background_color(tcPr, col_index, row_index)
+    
+    def _apply_cell_background_color(self, tcPr, col_index: int, row_index: int) -> None:
+        """Apply background color to a table cell based on its position"""
+        # Day names column (except header row)
+        if col_index == ColumnType.DAYS.value and row_index > TableDimensions.HEADER_ROW_INDEX:
+            self._apply_background_color(tcPr, ColorScheme.DAYS_COLUMN)
+        
+        # Detail categories column (except header row)
+        elif col_index == ColumnType.CATEGORIES.value and row_index > TableDimensions.HEADER_ROW_INDEX:
+            self._apply_background_color(tcPr, ColorScheme.CATEGORIES_COLUMN)
+        
+        # Time slots in header row
+        elif row_index == TableDimensions.HEADER_ROW_INDEX and col_index in self.time_slot_positions:
+            self._apply_background_color(tcPr, ColorScheme.HEADER_BACKGROUND)
+        
+        # Separator columns in header row
+        elif row_index == TableDimensions.HEADER_ROW_INDEX and col_index in self.separator_positions:
+            self._apply_background_color(tcPr, ColorScheme.HEADER_BACKGROUND)
+        
+        # Separator columns in content rows
+        elif row_index > TableDimensions.HEADER_ROW_INDEX and col_index in self.separator_positions:
+            self._apply_background_color(tcPr, ColorScheme.SEPARATOR_BACKGROUND)
     
     def _apply_background_color(self, tcPr, color_hex: str) -> None:
         """Apply background color to a table cell"""
