@@ -169,8 +169,8 @@ class WordGenerator:
     def _apply_formatting(self, table) -> None:
         """Apply formatting to the table"""
         # Apply borders and formatting to all cells
-        for row in table.rows:
-            for cell in row.cells:
+        for row_index, row in enumerate(table.rows):
+            for col_index, cell in enumerate(row.cells):
                 # Set font
                 for paragraph in cell.paragraphs:
                     for run in paragraph.runs:
@@ -187,6 +187,38 @@ class WordGenerator:
                                     f'<w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
                                     f'</w:tcBorders>')
                 tcPr.append(tcBorders)
+                
+                # Apply background colors
+                # Day names column (column 0) - #8DB3E2 (except header row)
+                if col_index == 0 and row_index > 0:
+                    self._apply_background_color(tcPr, "8DB3E2")
+                
+                # Detail categories column (column 1) - #B7DDE8 (except header row)
+                elif col_index == 1 and row_index > 0:
+                    self._apply_background_color(tcPr, "B7DDE8")
+                
+                # Time slots in header row (columns 2, 4, 6, 8) - #8DB3E2
+                elif row_index == 0 and col_index in [2, 4, 6, 8]:
+                    self._apply_background_color(tcPr, "8DB3E2")
+                
+                # Separator columns in header row (columns 3, 5, 7) - #8DB3E2
+                elif row_index == 0 and col_index in [3, 5, 7]:
+                    self._apply_background_color(tcPr, "8DB3E2")
+                
+                # Separator columns in content rows (columns 3, 5, 7) - #B7DDE8
+                elif row_index > 0 and col_index in [3, 5, 7]:
+                    self._apply_background_color(tcPr, "B7DDE8")
+    
+    def _apply_background_color(self, tcPr, color_hex: str) -> None:
+        """Apply background color to a table cell"""
+        # Remove any existing shading
+        for child in tcPr:
+            if child.tag.endswith('shd'):
+                tcPr.remove(child)
+        
+        # Add shading with the specified color
+        shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{color_hex}"/>')
+        tcPr.append(shd)
     
     def generate_word_document(self, weekly_schedule: WeeklySchedule, output_path: str) -> None:
         """Generate Word document from weekly schedule"""
