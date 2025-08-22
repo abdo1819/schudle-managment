@@ -379,23 +379,32 @@ class WordGenerator:
                         row_type = RowType.DAY_MIDDLE
                 
                 # Determine border widths
-                # Vertical borders: thick for time slot columns (both main and half), thin for others
+                # Start with default rules
                 if (col_index in self.time_slot_positions or 
                     col_index in self.time_slot_half_positions or 
                     col_index in self.separator_positions):
                     vertical_border_width = str(BorderWidth.THICK)
                 else:
                     vertical_border_width = str(BorderWidth.THIN)
+
+                # Ensure thick vertical borders for the day names column (outer-left outline)
+                if col_index == ColumnType.DAYS.value:
+                    vertical_border_width = str(BorderWidth.THICK)
                 
                 # Horizontal borders depend on row type
                 if row_type == RowType.HEADER:
-                    # Header row - all borders thin
-                    top_border_width = str(BorderWidth.THIN)
+                    # Header row – make top border thick to complete outer outline
+                    top_border_width = str(BorderWidth.THICK)
                     bottom_border_width = str(BorderWidth.THIN)
                 elif row_type == RowType.DAY_START:
                     # First row of day - top border thick, bottom border thin
                     top_border_width = str(BorderWidth.THICK)
-                    bottom_border_width = str(BorderWidth.THIN)
+                    # If this is the merged day cell row, we also want a thick bottom
+                    # border to ensure the outline of the merged cell across rows.
+                    if col_index == ColumnType.DAYS.value:
+                        bottom_border_width = str(BorderWidth.THICK)
+                    else:
+                        bottom_border_width = str(BorderWidth.THIN)
                 elif row_type == RowType.DAY_END:
                     # Last row of day - top border thin, bottom border thick
                     top_border_width = str(BorderWidth.THIN)
