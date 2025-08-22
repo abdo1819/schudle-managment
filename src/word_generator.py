@@ -146,6 +146,9 @@ class WordGenerator:
                 tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(width.inches * 1440)}" w:type="dxa"/>')
                 tcPr.append(tcW)
         
+        # Set table to RTL
+        self._set_table_rtl(table)
+        
         self._fill_header_row(table)
         self._fill_content_rows(table, weekly_schedule)
         self._apply_formatting(table)
@@ -160,8 +163,11 @@ class WordGenerator:
         
         # Fill each time slot in separate columns with separators
         for i, time_slot in enumerate(self.time_slots):
-            header_row.cells[self.time_slot_positions[i]].text = time_slot
-            header_row.cells[self.time_slot_positions[i]].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            cell = header_row.cells[self.time_slot_positions[i]]
+            cell.text = time_slot
+            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            # Set RTL for header cells
+            self._set_cell_rtl(cell)
         
         # Set separator columns to empty
         for pos in self.separator_positions:
@@ -181,15 +187,19 @@ class WordGenerator:
                 
                 # Day column (merged vertically for each day)
                 if category_index == 0:
-                    row.cells[ColumnType.DAYS.value].text = day_arabic
-                    row.cells[ColumnType.DAYS.value].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    day_cell = row.cells[ColumnType.DAYS.value]
+                    day_cell.text = day_arabic
+                    day_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    self._set_cell_rtl(day_cell)
                     # Merge vertically with next 3 rows
                     if row_index + 3 < len(table.rows):
-                        row.cells[ColumnType.DAYS.value].merge(table.rows[row_index + 3].cells[ColumnType.DAYS.value])
+                        day_cell.merge(table.rows[row_index + 3].cells[ColumnType.DAYS.value])
                 
                 # Category column
-                row.cells[ColumnType.CATEGORIES.value].text = category
-                row.cells[ColumnType.CATEGORIES.value].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                category_cell = row.cells[ColumnType.CATEGORIES.value]
+                category_cell.text = category
+                category_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                self._set_cell_rtl(category_cell)
                 
                 # Time slot columns with separators
                 for slot_index, slot_key in enumerate(self.slot_keys):
@@ -207,6 +217,10 @@ class WordGenerator:
                             cell.text = schedule_entry.assistant
                     else:
                         cell.text = ""
+                    
+                    # Set RTL and center alignment for all time slot cells
+                    cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    self._set_cell_rtl(cell)
                 
                 # Set separator columns to empty
                 for pos in self.separator_positions:
@@ -238,6 +252,11 @@ class WordGenerator:
                 
                 # Apply background colors based on column type and row position
                 self._apply_cell_background_color(tcPr, col_index, row_index)
+                
+                # Ensure all cells have RTL formatting and center alignment
+                if cell.text.strip():  # Only apply to non-empty cells
+                    cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    self._set_cell_rtl(cell)
     
     def _apply_cell_background_color(self, tcPr, col_index: int, row_index: int) -> None:
         """Apply background color to a table cell based on its position"""
@@ -271,6 +290,58 @@ class WordGenerator:
         # Add shading with the specified color
         shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{color_hex}"/>')
         tcPr.append(shd)
+    
+    def _set_table_rtl(self, table) -> None:
+        """Set the entire table to RTL direction"""
+        tbl = table._tbl
+        
+        # Get or create tblPr element
+        tblPr = tbl.tblPr
+        if tblPr is None:
+            tblPr = parse_xml(f'<w:tblPr {nsdecls("w")}/>')
+            tbl.insert(0, tblPr)
+        
+        # Remove any existing bidiVisual setting
+        for child in tblPr:
+            if child.tag.endswith('bidiVisual'):
+                tblPr.remove(child)
+        
+        # Add RTL setting
+        bidiVisual = parse_xml(f'<w:bidiVisual {nsdecls("w")}/>')
+        tblPr.append(bidiVisual)
+    
+    def _set_cell_rtl(self, cell) -> None:
+        """Set a cell to RTL direction"""
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        
+        # Remove any existing textDirection setting
+        for child in tcPr:
+            if child.tag.endswith('textDirection'):
+                tcPr.remove(child)
+        
+        # Add RTL text direction (horizontal RTL)
+        textDirection = parse_xml(f'<w:textDirection {nsdecls("w")} w:val="rtl"/>')
+        tcPr.append(textDirection)
+        
+        # Set paragraph direction to RTL
+        for paragraph in cell.paragraphs:
+            p = paragraph._p
+            
+            # Get or create pPr element
+            pPr = p.pPr
+            if pPr is None:
+                pPr = parse_xml(f'<w:pPr {nsdecls("w")}/>')
+                p.insert(0, pPr)
+            
+            # Remove any existing bidi setting
+            for child in pPr:
+                if child.tag.endswith('bidi'):
+                    pPr.remove(child)
+            
+            # Add RTL paragraph direction
+            bidi = parse_xml(f'<w:bidi {nsdecls("w")}/>')
+            pPr.append(bidi)
     
     def generate_word_document(self, weekly_schedule: WeeklySchedule, output_path: str) -> None:
         """Generate Word document from weekly schedule"""
