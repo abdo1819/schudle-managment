@@ -21,6 +21,15 @@ HEADER_DIVISION_PREFIX = "شعبة"
 HEADER_LEVEL_PREFIX = "الفرقة"
 HEADER_SCHEDULE_TEMPLATE = "شئون التعليم والطلاب نموذج الجداول الدراسية"
 
+# Footer constants
+FOOTER_DEAN_TITLE = "عميد الكلية"
+FOOTER_DEAN_NAME = "ا.د. رانيا احمد عبدالعظيم"
+FOOTER_VICE_DEAN_TITLE = "وكيل الكلية لشئون التعليم والطلاب"
+FOOTER_VICE_DEAN_NAME = "ا.د. احمد سرج فريد"
+FOOTER_HEAD_DEPARTMENT_TITLE = "رئيس قسم الهندسة الكهربية"
+FOOTER_HEAD_DEPARTMENT_NAME = "ا.د. عمرو رفعت"
+FOOTER_GENERATION_INFO = "{date}"
+
 
 class ColumnType(Enum):
     """Enum for different column types"""
@@ -563,20 +572,17 @@ class WordGenerator:
         # Clear existing content safely
         self._clear_section_content(footer)
         
-        # Add footer paragraph
-        footer_para = footer.add_paragraph()
-        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Create footer table with three columns
+        footer_table = self._create_footer_table(footer)
         
-        # Add footer text
-        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        footer_text = f"تم إنشاء هذا الجدول تلقائياً في {current_date} - نظام إدارة الجداول الدراسية"
-        footer_run = footer_para.add_run(footer_text)
-        footer_run.font.name = FontConfig.FONT_NAME
-        footer_run.font.size = FontConfig.FOOTER_SIZE
-        footer_run.font.italic = True
+        # Fill footer content
+        self._fill_footer_content(footer_table)
         
-        # Set footer to RTL
-        self._set_paragraph_rtl(footer_para)
+        # Apply formatting
+        self._apply_footer_formatting(footer_table)
+        
+        # Add generation info below the table
+        self._add_generation_info(footer)
     
     def _add_logo_to_cell(self, cell) -> None:
         """Add logo image to a table cell"""
@@ -613,6 +619,77 @@ class WordGenerator:
             cell.text = "[LOGO]"
             cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
             self._set_cell_rtl(cell)
+    
+    def _create_footer_table(self, footer) -> Any:
+        """Create and configure footer table with proper column widths"""
+        # Add footer table with three columns: right, center, left
+        footer_table = footer.add_table(rows=2, cols=3, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
+        footer_table.style = 'Table Grid'
+        footer_table.autofit = False
+        footer_table.allow_autofit = False
+        
+        # Set column widths (right, center, left)
+        column_widths = [2.5, 3.0, 2.5]  # in inches
+        for i, column in enumerate(footer_table.columns):
+            for cell in column.cells:
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{int(column_widths[i] * 1440)}" w:type="dxa"/>')
+                tcPr.append(tcW)
+        
+        return footer_table
+    
+    def _fill_footer_content(self, footer_table) -> None:
+        """Fill footer table with content"""
+        # Right column (Dean info)
+        footer_table.rows[0].cells[0].text = FOOTER_DEAN_TITLE
+        footer_table.rows[1].cells[0].text = FOOTER_DEAN_NAME
+        
+        # Center column (Vice Dean info)
+        footer_table.rows[0].cells[1].text = FOOTER_VICE_DEAN_TITLE
+        footer_table.rows[1].cells[1].text = FOOTER_VICE_DEAN_NAME
+        
+        # Left column (Head of Department info)
+        footer_table.rows[0].cells[2].text = FOOTER_HEAD_DEPARTMENT_TITLE
+        footer_table.rows[1].cells[2].text = FOOTER_HEAD_DEPARTMENT_NAME
+    
+    def _apply_footer_formatting(self, footer_table) -> None:
+        """Apply formatting to footer table"""
+        for row in footer_table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    for run in paragraph.runs:
+                        run.font.name = FontConfig.FONT_NAME
+                        run.font.size = FontConfig.FOOTER_SIZE
+                        run.font.bold = True
+                        self._set_paragraph_rtl(paragraph)
+        
+        # Set footer table to RTL
+        self._set_table_rtl(footer_table)
+        
+        # Remove borders from footer table to match image
+        self._remove_table_borders(footer_table)
+    
+    def _add_generation_info(self, footer) -> None:
+        """Add generation information below the footer table"""
+        # Add spacing
+        
+        
+        # Add generation info paragraph
+        footer_para = footer.add_paragraph()
+        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Add footer text
+        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        footer_text = FOOTER_GENERATION_INFO.format(date=current_date)
+        footer_run = footer_para.add_run(footer_text)
+        footer_run.font.name = FontConfig.FONT_NAME
+        footer_run.font.size = FontConfig.FOOTER_SIZE
+        footer_run.font.italic = True
+        
+        # Set footer to RTL
+        self._set_paragraph_rtl(footer_para)
     
     def _remove_table_borders(self, table) -> None:
         """Remove all borders from a table"""
