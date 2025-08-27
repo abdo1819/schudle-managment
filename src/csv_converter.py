@@ -113,7 +113,7 @@ class CSVConverter:
     def create_schedule_entry(self, csv_row: CSVRow) -> ScheduleEntry:
         """Create ScheduleEntry from CSVRow"""
         return ScheduleEntry(
-            course_name=csv_row.course_name or "",  # Use empty string if None
+            course_name=f"{csv_row.code} - {csv_row.course_name} - {csv_row.activity_type}" or "",  # Use empty string if None
             location=csv_row.location,
             instructor=csv_row.main_tutor or "",  # Use empty string if None
             assistant=csv_row.helping_stuff or "",  # Use empty string if None
@@ -188,6 +188,9 @@ class CSVConverter:
             )
             
             schedules.append(speciality_level_schedule)
+        
+        # Sort schedules first by specialty, then by level
+        schedules.sort(key=lambda x: (x.speciality, x.level))
         
         return MultiLevelSchedule(schedules=schedules)
     
