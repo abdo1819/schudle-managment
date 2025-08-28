@@ -11,24 +11,145 @@ from datetime import datetime
 import os
 
 
-# Header constants
-HEADER_UNIVERSITY_NAME = "جامعة الفيوم"
-HEADER_FACULTY_NAME = "كلية الهندسة"
-HEADER_DEPARTMENT_PREFIX = "قسم الهندسة الكهربية"
-HEADER_ACADEMIC_YEAR = "العام الجامعي 2025 - 2026"
-HEADER_SEMESTER = "الفصل الدراسي الأول"
-HEADER_DIVISION_PREFIX = "شعبة"
-HEADER_LEVEL_PREFIX = "الفرقة"
-HEADER_SCHEDULE_TEMPLATE = "شئون التعليم والطلاب نموذج الجداول الدراسية"
+# Level and Speciality Mappings
+LEVEL_MAPPING = {
+    "100": "الأول",
+    "200": "الثاني", 
+    "300": "الثالث",
+    "400": "الرابع"
+}
+
+# Base speciality mapping (for most cases)
+SPECIALITY_MAPPING = {
+    "pow": "القوي والآلات الكهربية",
+    "comm": "الاتصالات",
+    "comp": "الحاسبات"
+}
+
+# Level-dependent speciality mapping for special cases
+LEVEL_SPECIALITY_MAPPING = {
+    "comm": {
+        "100": "الاتصالات والحاسبات",
+        "200": "الاتصالات والحاسبات"
+    }
+}
+
+# Header constants (moved to level config)
 
 # Footer constants
-FOOTER_DEAN_TITLE = "عميد الكلية"
-FOOTER_DEAN_NAME = "ا.د. رانيا احمد عبدالعظيم"
-FOOTER_VICE_DEAN_TITLE = "وكيل الكلية لشئون التعليم والطلاب"
-FOOTER_VICE_DEAN_NAME = "ا.د. احمد سرج فريد"
-FOOTER_HEAD_DEPARTMENT_TITLE = "رئيس قسم الهندسة الكهربية"
-FOOTER_HEAD_DEPARTMENT_NAME = "ا.د. عمرو رفعت"
 FOOTER_GENERATION_INFO = "{date}"
+
+# Base configuration for all levels
+BASE_LEVEL_CONFIG = {
+    "header": {
+        "university_name": "جامعة الفيوم",
+        "faculty_name": "كلية الهندسة",
+        "department_prefix": "قسم الهندسة الكهربية",
+        "academic_year": "العام الجامعي 2025 - 2026",
+        "semester": "الفصل الدراسي الأول",
+        "division_prefix": "شعبة",
+        "level_prefix": "الفرقة",
+        "schedule_template": "شئون التعليم والطلاب نموذج الجداول الدراسية"
+    },
+    "footer": {
+        "dean_title": "عميد الكلية",
+        "dean_name": "ا.د. رانيا احمد عبدالعظيم",
+        "vice_dean_title": "وكيل الكلية لشئون التعليم والطلاب",
+        "vice_dean_name": "ا.د. احمد سرج فريد",
+        "head_department_title": "رئيس قسم الهندسة الكهربية",
+        "head_department_name": "ا.د. عمرو رفعت",
+    }
+}
+
+# Level-specific overrides
+LEVEL_OVERRIDES = {
+    "100": {
+        "header": {
+            "level_prefix": "المستوي"
+        },
+        "footer": {
+            "program_manager_title": "منسق البرنامج",
+        }
+    },
+    "200": {
+        "header": {
+            "level_prefix": "المستوي"
+        },
+        "footer": {
+            "program_manager_title": "منسق البرنامج",
+        }
+    }
+}
+
+# Specialty-specific overrides
+SPECIALTY_OVERRIDES = {
+    "comm": {
+        "footer": {
+            "program_manager_name": "أ.د محمد حمدي"
+        }
+    },
+    "pow": {
+        "footer": {
+            "program_manager_name": "أ.د خالد عبدالله"
+        }
+    }
+}
+
+# Function to get mapped values
+def _get_mapped_level(level: str) -> str:
+    """Get the Arabic representation of the level"""
+    return LEVEL_MAPPING.get(level, level)
+
+def _get_mapped_speciality(speciality: str, level: str = None) -> str:
+    """Get the Arabic representation of the speciality"""
+    # Check if this speciality has level-dependent mapping
+    if speciality in LEVEL_SPECIALITY_MAPPING and level:
+        level_mapping = LEVEL_SPECIALITY_MAPPING[speciality]
+        if level in level_mapping:
+            return level_mapping[level]
+    
+    # Fall back to base mapping
+    return SPECIALITY_MAPPING.get(speciality, speciality)
+
+# Function to merge base config with level-specific overrides
+def _get_level_config(level: str, specialty: str = None) -> dict:
+    """Get the configuration for a specific level and specialty by merging base config with overrides"""
+    import copy
+    
+    # Start with a deep copy of the base configuration
+    config = copy.deepcopy(BASE_LEVEL_CONFIG)
+    
+    # Apply level-specific overrides if they exist
+    if level in LEVEL_OVERRIDES:
+        level_override = LEVEL_OVERRIDES[level]
+        
+        # Merge header overrides
+        if "header" in level_override:
+            config["header"].update(level_override["header"])
+        
+        # Merge footer overrides
+        if "footer" in level_override:
+            config["footer"].update(level_override["footer"])
+    
+    # Apply specialty-specific overrides if they exist
+    if specialty and specialty in SPECIALTY_OVERRIDES:
+        specialty_override = SPECIALTY_OVERRIDES[specialty]
+        
+        # Merge header overrides
+        if "header" in specialty_override:
+            config["header"].update(specialty_override["header"])
+        
+        # Merge footer overrides
+        if "footer" in specialty_override:
+            config["footer"].update(specialty_override["footer"])
+    
+    return config
+
+# Level-specific header and footer configurations (computed from base + overrides)
+# Note: This is now deprecated in favor of calling _get_level_config directly with level and specialty
+LEVEL_CONFIGS = {
+    level: _get_level_config(level) for level in ["100", "200", "300", "400"]
+}
 
 
 class ColumnType(Enum):
@@ -158,6 +279,18 @@ class WordGenerator:
             ColumnType.TIME_SLOT_4_HALF.value: TableDimensions.TIME_SLOT_HALF_WIDTH
         }
     
+    def _validate_level(self, level: str) -> str:
+        """Validate that the level is one of the allowed values [100, 200, 300, 400]"""
+        allowed_levels = ["100", "200", "300", "400"]
+        if level not in allowed_levels:
+            raise ValueError(f"Level must be one of {allowed_levels}, got: {level}")
+        return level
+    
+    def _get_level_config(self, level: str, specialty: str = None) -> dict:
+        """Get the configuration for a specific level and specialty"""
+        validated_level = self._validate_level(level)
+        return _get_level_config(validated_level, specialty)
+    
     def create_document(self) -> Document:
         """Create a new Word document"""
         doc = Document()
@@ -177,10 +310,10 @@ class WordGenerator:
         section = doc.sections[0]
         self._add_header_to_section(section, speciality, level)
     
-    def add_page_footer(self, doc: Document) -> None:
+    def add_page_footer(self, doc: Document, level: str, specialty: str = None) -> None:
         """Add page footer with generation information"""
         section = doc.sections[0]
-        self._add_footer_to_section(section)
+        self._add_footer_to_section(section, level, specialty)
     
     def add_speciality_level_title(self, doc: Document, speciality: str, level: str) -> None:
         """Add title for specialty and level combination"""
@@ -192,7 +325,7 @@ class WordGenerator:
         title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         # Add title text
-        title_text = f"جدول {speciality} - {level}"
+        title_text = f"جدول {_get_mapped_speciality(speciality, level)} - {_get_mapped_level(level)}"
         title_run = title_para.add_run(title_text)
         title_run.font.name = FontConfig.FONT_NAME
         title_run.font.size = FontConfig.TITLE_SIZE
@@ -691,10 +824,14 @@ class WordGenerator:
     
     def _fill_header_content(self, header_table, speciality: str, level: str) -> None:
         """Fill header table with content"""
+        # Get level-specific configuration
+        level_config = self._get_level_config(level, speciality)
+        header_config = level_config["header"]
+        
         # Right column (University/Faculty/Department info)
-        header_table.rows[0].cells[0].text = HEADER_UNIVERSITY_NAME
-        header_table.rows[1].cells[0].text = HEADER_FACULTY_NAME
-        header_table.rows[2].cells[0].text = f"{HEADER_DEPARTMENT_PREFIX}"
+        header_table.rows[0].cells[0].text = header_config["university_name"]
+        header_table.rows[1].cells[0].text = header_config["faculty_name"]
+        header_table.rows[2].cells[0].text = f"{header_config['department_prefix']}"
         
         # Center column (Logo and title)
         # Add logo to the first row
@@ -706,12 +843,12 @@ class WordGenerator:
         if title_cell.paragraphs[0].runs:
             # If logo was added, add title to a new paragraph
             title_para = title_cell.add_paragraph()
-            title_para.text = HEADER_SCHEDULE_TEMPLATE
+            title_para.text = header_config["schedule_template"]
             title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
             self._set_paragraph_rtl(title_para)
         else:
             # If no logo, add title to first paragraph
-            title_cell.text = HEADER_SCHEDULE_TEMPLATE
+            title_cell.text = header_config["schedule_template"]
             title_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
             self._set_cell_rtl(title_cell)
         
@@ -719,9 +856,9 @@ class WordGenerator:
         header_table.rows[1].cells[1].text = ""
         
         # Left column (Academic details)
-        header_table.rows[0].cells[2].text = HEADER_ACADEMIC_YEAR
-        header_table.rows[1].cells[2].text = HEADER_SEMESTER
-        header_table.rows[2].cells[2].text = f"{HEADER_LEVEL_PREFIX} {level} {HEADER_DIVISION_PREFIX} {speciality}"
+        header_table.rows[0].cells[2].text = header_config["academic_year"]
+        header_table.rows[1].cells[2].text = header_config["semester"]
+        header_table.rows[2].cells[2].text = f"{header_config['level_prefix']} {_get_mapped_level(level)} {header_config['division_prefix']} {_get_mapped_speciality(speciality, level)}"
     
     def _apply_header_formatting(self, header_table) -> None:
         """Apply formatting to header table"""
@@ -758,7 +895,7 @@ class WordGenerator:
         # Apply formatting
         self._apply_header_formatting(header_table)
     
-    def _add_footer_to_section(self, section) -> None:
+    def _add_footer_to_section(self, section, level: str, specialty: str = None) -> None:
         """Add footer to a specific section"""
         # Create footer
         footer = section.footer
@@ -766,11 +903,11 @@ class WordGenerator:
         # Clear existing content safely
         self._clear_section_content(footer)
         
-        # Create footer table with three columns
-        footer_table = self._create_footer_table(footer)
+        # Create footer table with dynamic columns based on level
+        footer_table = self._create_footer_table(footer, level, specialty)
         
         # Fill footer content
-        self._fill_footer_content(footer_table)
+        self._fill_footer_content(footer_table, level, specialty)
         
         # Apply formatting
         self._apply_footer_formatting(footer_table)
@@ -814,16 +951,28 @@ class WordGenerator:
             cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
             self._set_cell_rtl(cell)
     
-    def _create_footer_table(self, footer) -> Any:
+    def _create_footer_table(self, footer, level: str, specialty: str = None) -> Any:
         """Create and configure footer table with proper column widths"""
-        # Add footer table with three columns: right, center, left
-        footer_table = footer.add_table(rows=2, cols=3, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
+        level_config = self._get_level_config(level, specialty)
+        footer_config = level_config["footer"]
+        
+        # Check if program manager is present (levels 100, 200 have program manager)
+        has_program_manager = "program_manager_title" in footer_config
+        
+        if has_program_manager:
+            cols = 4
+            column_widths = [2.0, 2.0, 2.0, 2.0]  # Equal width for 4 columns
+        else:
+            cols = 3
+            column_widths = [2.5, 3.0, 2.5]  # in inches
+        
+        # Add footer table with dynamic columns
+        footer_table = footer.add_table(rows=2, cols=cols, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
         footer_table.style = 'Table Grid'
         footer_table.autofit = False
         footer_table.allow_autofit = False
         
-        # Set column widths (right, center, left)
-        column_widths = [2.5, 3.0, 2.5]  # in inches
+        # Set column widths
         for i, column in enumerate(footer_table.columns):
             for cell in column.cells:
                 tc = cell._tc
@@ -833,19 +982,45 @@ class WordGenerator:
         
         return footer_table
     
-    def _fill_footer_content(self, footer_table) -> None:
+    def _fill_footer_content(self, footer_table, level: str, specialty: str = None) -> None:
         """Fill footer table with content"""
-        # Right column (Dean info)
-        footer_table.rows[0].cells[0].text = FOOTER_DEAN_TITLE
-        footer_table.rows[1].cells[0].text = FOOTER_DEAN_NAME
+        # Get level-specific configuration
+        level_config = self._get_level_config(level, specialty)
+        footer_config = level_config["footer"]
         
-        # Center column (Vice Dean info)
-        footer_table.rows[0].cells[1].text = FOOTER_VICE_DEAN_TITLE
-        footer_table.rows[1].cells[1].text = FOOTER_VICE_DEAN_NAME
+        # Check if program manager is present (levels 100, 200 have program manager)
+        has_program_manager = "program_manager_title" in footer_config
         
-        # Left column (Head of Department info)
-        footer_table.rows[0].cells[2].text = FOOTER_HEAD_DEPARTMENT_TITLE
-        footer_table.rows[1].cells[2].text = FOOTER_HEAD_DEPARTMENT_NAME
+        if has_program_manager:
+            # For levels 100, 200, use 4 columns including program manager
+            # Column 0: Dean info
+            footer_table.rows[0].cells[0].text = footer_config['dean_title']
+            footer_table.rows[1].cells[0].text = footer_config['dean_name']
+            
+            # Column 1: Vice Dean info
+            footer_table.rows[0].cells[1].text = footer_config['vice_dean_title']
+            footer_table.rows[1].cells[1].text = footer_config['vice_dean_name']
+            
+            # Column 2: Head of Department info
+            footer_table.rows[0].cells[2].text = footer_config['head_department_title']
+            footer_table.rows[1].cells[2].text = footer_config['head_department_name']
+            
+            # Column 3: Program Manager info
+            footer_table.rows[0].cells[3].text = footer_config['program_manager_title']
+            footer_table.rows[1].cells[3].text = footer_config['program_manager_name']
+        else:
+            # For levels 300, 400, use 3 columns
+            # Right column (Dean info)
+            footer_table.rows[0].cells[0].text = footer_config['dean_title']
+            footer_table.rows[1].cells[0].text = footer_config['dean_name']
+            
+            # Center column (Vice Dean info)
+            footer_table.rows[0].cells[1].text = footer_config['vice_dean_title']
+            footer_table.rows[1].cells[1].text = footer_config['vice_dean_name']
+            
+            # Left column (Head of Department info)
+            footer_table.rows[0].cells[2].text = footer_config['head_department_title']
+            footer_table.rows[1].cells[2].text = footer_config['head_department_name']
     
     def _apply_footer_formatting(self, footer_table) -> None:
         """Apply formatting to footer table"""
@@ -936,7 +1111,7 @@ class WordGenerator:
                 new_section.footer.is_linked_to_previous = False
                 # Add header and footer to the new section
                 self._add_header_to_section(new_section, schedule.speciality, schedule.level)
-                self._add_footer_to_section(new_section)
+                self._add_footer_to_section(new_section, schedule.level, schedule.speciality)
             else:
                 # First page uses the default section
                 section = doc.sections[0]
@@ -944,7 +1119,7 @@ class WordGenerator:
                 section.header.is_linked_to_previous = False
                 section.footer.is_linked_to_previous = False
                 self._add_header_to_section(section, schedule.speciality, schedule.level)
-                self._add_footer_to_section(section)
+                self._add_footer_to_section(section, schedule.level, schedule.speciality)
             
             # Create table for this combination
             doc.add_paragraph()

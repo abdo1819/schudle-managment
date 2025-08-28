@@ -98,6 +98,102 @@ class TestWordGenerator:
         finally:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
+    
+    def test_get_level_range(self):
+         """Test level range determination"""
+         # Test levels 100-200
+         assert self.generator._get_level_range("100") == "100_200"
+         assert self.generator._get_level_range("150") == "100_200"
+         assert self.generator._get_level_range("200") == "100_200"
+         
+         # Test levels 300-400
+         assert self.generator._get_level_range("300") == "300_400"
+         assert self.generator._get_level_range("350") == "300_400"
+         assert self.generator._get_level_range("400") == "300_400"
+         
+         # Test other levels (should return general)
+         assert self.generator._get_level_range("500") == "general"
+         assert self.generator._get_level_range("50") == "general"
+         assert self.generator._get_level_range("invalid") == "general"
+         assert self.generator._get_level_range("") == "general"
+    
+    def test_get_header_schedule_template(self):
+        """Test header schedule template selection based on level"""
+        from src.word_generator import (
+            HEADER_SCHEDULE_TEMPLATE,
+            HEADER_SCHEDULE_TEMPLATE_LEVEL_100_200,
+            HEADER_SCHEDULE_TEMPLATE_LEVEL_300_400
+        )
+        
+        # Test levels 100-200
+        assert self.generator._get_header_schedule_template("100") == HEADER_SCHEDULE_TEMPLATE_LEVEL_100_200
+        assert self.generator._get_header_schedule_template("150") == HEADER_SCHEDULE_TEMPLATE_LEVEL_100_200
+        assert self.generator._get_header_schedule_template("200") == HEADER_SCHEDULE_TEMPLATE_LEVEL_100_200
+        
+        # Test levels 300-400
+        assert self.generator._get_header_schedule_template("300") == HEADER_SCHEDULE_TEMPLATE_LEVEL_300_400
+        assert self.generator._get_header_schedule_template("350") == HEADER_SCHEDULE_TEMPLATE_LEVEL_300_400
+        assert self.generator._get_header_schedule_template("400") == HEADER_SCHEDULE_TEMPLATE_LEVEL_300_400
+        
+        # Test other levels (should return default)
+        assert self.generator._get_header_schedule_template("500") == HEADER_SCHEDULE_TEMPLATE
+        assert self.generator._get_header_schedule_template("50") == HEADER_SCHEDULE_TEMPLATE
+        assert self.generator._get_header_schedule_template("invalid") == HEADER_SCHEDULE_TEMPLATE
+    
+    def test_get_header_prefixes(self):
+        """Test header prefixes selection based on level"""
+        from src.word_generator import (
+            HEADER_DIVISION_PREFIX, HEADER_LEVEL_PREFIX,
+            HEADER_DIVISION_PREFIX_LEVEL_100_200, HEADER_LEVEL_PREFIX_LEVEL_100_200,
+            HEADER_DIVISION_PREFIX_LEVEL_300_400, HEADER_LEVEL_PREFIX_LEVEL_300_400
+        )
+        
+        # Test levels 100-200
+        header_prefixes_100_200 = self.generator._get_header_prefixes("100")
+        assert header_prefixes_100_200['division_prefix'] == HEADER_DIVISION_PREFIX_LEVEL_100_200
+        assert header_prefixes_100_200['level_prefix'] == HEADER_LEVEL_PREFIX_LEVEL_100_200
+        
+        # Test levels 300-400
+        header_prefixes_300_400 = self.generator._get_header_prefixes("300")
+        assert header_prefixes_300_400['division_prefix'] == HEADER_DIVISION_PREFIX_LEVEL_300_400
+        assert header_prefixes_300_400['level_prefix'] == HEADER_LEVEL_PREFIX_LEVEL_300_400
+        
+        # Test other levels (should return default)
+        header_prefixes_general = self.generator._get_header_prefixes("500")
+        assert header_prefixes_general['division_prefix'] == HEADER_DIVISION_PREFIX
+        assert header_prefixes_general['level_prefix'] == HEADER_LEVEL_PREFIX
+    
+    def test_get_footer_texts(self):
+         """Test footer texts selection based on level"""
+         from src.word_generator import (
+             FOOTER_DEAN_TITLE, FOOTER_DEAN_NAME,
+             FOOTER_DEAN_TITLE_LEVEL_100_200, FOOTER_DEAN_NAME_LEVEL_100_200,
+             FOOTER_DEAN_TITLE_LEVEL_300_400, FOOTER_DEAN_NAME_LEVEL_300_400,
+             FOOTER_PROGRAM_MANAGER_TITLE_LEVEL_100_200, FOOTER_PROGRAM_MANAGER_NAME_LEVEL_100_200
+         )
+         
+         # Test levels 100-200
+         footer_texts_100_200 = self.generator._get_footer_texts("100")
+         assert footer_texts_100_200['dean_title'] == FOOTER_DEAN_TITLE_LEVEL_100_200
+         assert footer_texts_100_200['dean_name'] == FOOTER_DEAN_NAME_LEVEL_100_200
+         assert footer_texts_100_200['program_manager_title'] == FOOTER_PROGRAM_MANAGER_TITLE_LEVEL_100_200
+         assert footer_texts_100_200['program_manager_name'] == FOOTER_PROGRAM_MANAGER_NAME_LEVEL_100_200
+         
+         # Test levels 300-400
+         footer_texts_300_400 = self.generator._get_footer_texts("300")
+         assert footer_texts_300_400['dean_title'] == FOOTER_DEAN_TITLE_LEVEL_300_400
+         assert footer_texts_300_400['dean_name'] == FOOTER_DEAN_NAME_LEVEL_300_400
+         # Program manager should not be present for 300-400 levels
+         assert 'program_manager_title' not in footer_texts_300_400
+         assert 'program_manager_name' not in footer_texts_300_400
+         
+         # Test other levels (should return default)
+         footer_texts_general = self.generator._get_footer_texts("500")
+         assert footer_texts_general['dean_title'] == FOOTER_DEAN_TITLE
+         assert footer_texts_general['dean_name'] == FOOTER_DEAN_NAME
+         # Program manager should not be present for general levels
+         assert 'program_manager_title' not in footer_texts_general
+         assert 'program_manager_name' not in footer_texts_general
 
     def test_generate_word_document_empty_schedule_manual_review(self):
         """Test generating Word document with empty schedule"""
