@@ -90,7 +90,7 @@ SPECIALTY_OVERRIDES = {
     },
     "pow": {
         "footer": {
-            "program_manager_name": "أ.د خالد عبدالله"
+            "program_manager_name": "أ.د خالد حسني"
         }
     }
 }

@@ -115,8 +115,8 @@ class CSVConverter:
         return ScheduleEntry(
             course_name=f"{csv_row.code} - {csv_row.course_name} - {csv_row.activity_type}" or "",  # Use empty string if None
             location=csv_row.location,
-            instructor=csv_row.main_tutor or "",  # Use empty string if None
-            assistant=csv_row.helping_stuff or "",  # Use empty string if None
+            instructor=csv_row.main_tutor_write or "",  # Use empty string if None
+            assistant=csv_row.helping_stuff_write or "",  # Use empty string if None
             is_half_slot=csv_row.is_half_slot or False  # Handle half slot field
         )
     
@@ -136,7 +136,7 @@ class CSVConverter:
         for csv_row in csv_rows:
             # Use speciality and level, with fallbacks for missing values
             speciality = csv_row.speciality or csv_row.specialy_level or "عام"
-            level = csv_row.level or "عام"
+            level = csv_row.get_level()
             
             key = (speciality, level)
             if key not in grouped_rows:

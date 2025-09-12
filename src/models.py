@@ -51,6 +51,15 @@ class CSVRow(BaseModel):
     sp_code: Optional[str] = None
     main_tutor: Optional[str] = Field(alias="main_tutor", default=None)
     helping_stuff: Optional[str] = Field(alias="helping_stuff", default=None)
+    main_tutor_write: Optional[str] = Field(alias="main_tutor_write", default=None)
+    helping_stuff_write: Optional[str] = Field(alias="helping_stuff_write", default=None)
+
+    def get_level(self) -> str:
+        """Get the level as a string, converting float values like 100.0 to '100'"""
+        if self.level is None:
+            return "عام"
+        # Convert to float first to handle string numbers, then to int to remove decimals, then to string
+        return str(int(float(self.level)))
 
 
 class ScheduleEntry(BaseModel):
