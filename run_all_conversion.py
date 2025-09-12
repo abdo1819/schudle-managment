@@ -39,11 +39,11 @@ def test_multi_level_conversion():
         os.makedirs(output_folder)
         print(f"📁 Created output folder: {output_folder}")
     
-    # --- Level View ---
+    # --- File Paths ---
     output_level_file = os.path.join(output_folder, f"output_multi_level_{timestamp}.docx")
-    
-    # --- Location View ---
     output_location_file = os.path.join(output_folder, f"output_multi_location_{timestamp}.docx")
+    output_main_tutor_file = os.path.join(output_folder, f"output_main_tutor_load_{timestamp}.docx")
+    output_helping_stuff_file = os.path.join(output_folder, f"output_helping_staff_load_{timestamp}.docx")
     
     print(f"🧪 Testing multi-level conversion with: {input_file}")
     print("=" * 50)
@@ -52,28 +52,33 @@ def test_multi_level_conversion():
         # Create converter
         converter = ScheduleConverter()
         
-        # Get multi-level schedule structure
-        print("📊 Analyzing data structure...")
-        multi_level_schedule = converter.get_multi_level_schedule(input_file)
-        
-        print(f"📋 Found {len(multi_level_schedule.schedules)} specialty-level combinations:")
-        for i, schedule in enumerate(multi_level_schedule.schedules, 1):
-            print(f"   {i}. {schedule.speciality} - {schedule.level}")
-        
+        # --- Level View ---
         print("\n🔄 Generating Word document for level view...")
         converter.convert_file_to_multi_level_word(input_file, output_level_file)
         
+        # --- Location View ---
         print("\n🔄 Generating Word document for location view...")
         converter.convert_file_to_multi_location_word(input_file, output_location_file)
+
+        # --- Staff Load View ---
+        print("\n🔄 Generating Word document for main tutor load view...")
+        converter.convert_file_to_multi_staff_word(input_file, output_main_tutor_file, 'main_tutor')
+
+        print("\n🔄 Generating Word document for helping stuff load view...")
+        converter.convert_file_to_multi_staff_word(input_file, output_helping_stuff_file, 'helping_stuff')
         
         print(f"\n✅ Test completed successfully!")
         print(f"📁 Output folder: {output_folder}")
         print(f"📄 Output file (level view): {output_level_file}")
         print(f"📄 Output file (location view): {output_location_file}")
+        print(f"📄 Output file (main tutor load): {output_main_tutor_file}")
+        print(f"📄 Output file (helping stuff load): {output_helping_stuff_file}")
 
         # Convert to PDF and open
         convert_to_pdf_and_open(output_level_file)
         convert_to_pdf_and_open(output_location_file)
+        convert_to_pdf_and_open(output_main_tutor_file)
+        convert_to_pdf_and_open(output_helping_stuff_file)
         
     except Exception as e:
         print(f"❌ Test failed: {e}")

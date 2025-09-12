@@ -49,8 +49,8 @@ class CSVRow(BaseModel):
     teaching_hours: Optional[str] = Field(alias="teaching_hours", default=None)
     teaching_hours_printable: Optional[str] = Field(alias="teachin_hourse_printalble", default=None)
     sp_code: Optional[str] = None
-    main_tutor: Optional[str] = Field(alias="main_tutor", default=None)
-    helping_stuff: Optional[str] = Field(alias="helping_stuff", default=None)
+    main_tutor: Optional[str] = None
+    helping_stuff: Optional[str] = None
     main_tutor_write: Optional[str] = Field(alias="main_tutor_write", default=None)
     helping_stuff_write: Optional[str] = Field(alias="helping_stuff_write", default=None)
 
@@ -131,6 +131,17 @@ class MultiLocationSchedule(BaseModel):
             if schedule.location == location:
                 return schedule.weekly_schedule
         return None
+
+
+class StaffSchedule(BaseModel):
+    """Schedule for a specific staff member"""
+    staff_name: str
+    weekly_schedule: WeeklySchedule
+
+
+class MultiStaffSchedule(BaseModel):
+    """Complete multi-staff schedule with all staff members"""
+    schedules: List[StaffSchedule]
 
 
 class TableCell(BaseModel):

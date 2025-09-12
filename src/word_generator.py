@@ -6,7 +6,10 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.section import WD_ORIENT
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
-from .models import MultiLocationSchedule, WeeklySchedule, ScheduleEntry, DayOfWeek, TimeSlot, DetailCategory, TableCell, MultiLevelSchedule, SpecialityLevelSchedule
+from .models import (MultiLocationSchedule, WeeklySchedule, ScheduleEntry, 
+                     DayOfWeek, TimeSlot, DetailCategory, TableCell, 
+                     MultiLevelSchedule, SpecialityLevelSchedule, 
+                     MultiStaffSchedule, StaffSchedule)
 from enum import Enum
 from datetime import datetime
 import os
@@ -230,6 +233,13 @@ class WordGenerator:
     """Generates Word document with schedule table"""
     
     def __init__(self):
+        self.day_mapping = {
+            "الأحد": "sunday",
+            "الاثنين": "monday", 
+            "الثلاثاء": "tuesday",
+            "الأربعاء": "wednesday",
+            "الخميس": "thursday"
+        }
         self.days_arabic = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس"]
         self.detail_categories = [
             "اسم المادة",
@@ -1212,3 +1222,138 @@ class LocationWordGenerator(WordGenerator):
 
         doc.save(output_path)
 
+
+class StaffWordGenerator(WordGenerator):
+    """Generates Word document with schedule table for each staff member"""
+
+    def add_staff_title(self, doc: Document, staff_name: str) -> None:
+        """Add title for staff member"""
+        title_para = doc.add_paragraph()
+        title_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        title_para.paragraph_format.space_after = Pt(0)
+        title_para.paragraph_format.keep_with_next = True
+        title_text = f"جدول احمال  {staff_name}"
+        title_run = title_para.add_run(title_text)
+        title_run.font.name = FontConfig.FONT_NAME
+        title_run.font.size = Pt(10)
+        title_run.font.bold = True
+        self._set_paragraph_rtl(title_para)
+
+    def create_staff_table_structure(self, doc: Document, weekly_schedule: WeeklySchedule) -> None:
+        """Create the main table structure for a staff member, filtering out empty days"""
+        active_days = [day for day, day_schedule in weekly_schedule.items() if any(day_schedule.values())]
+        if not active_days:
+            return  # No table needed if no active days
+
+        num_rows = len(active_days) * TableDimensions.ROWS_PER_DAY + 1
+        table = doc.add_table(rows=num_rows, cols=TableDimensions.TOTAL_COLUMNS)
+        table.style = 'Table Grid'
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        table.autofit = False
+        table.allow_autofit = False
+
+        total_width_inches = sum(self.column_widths.values())
+        table.width = Inches(total_width_inches)
+        self._set_table_column_widths(table)
+        self._set_table_rtl(table)
+
+        self._fill_header_row(table)
+        self._fill_staff_content_rows(table, weekly_schedule, active_days)
+        self._apply_formatting(table)
+        self._apply_table_outline_borders(table)
+
+    def _fill_staff_content_rows(self, table, weekly_schedule: WeeklySchedule, active_days: List[str]) -> None:
+        """Fill the content rows with schedule data for active days"""
+        row_index = TableDimensions.CONTENT_START_ROW_INDEX
+        day_map = {v: k for k, v in self.day_mapping.items()}
+
+        for day_key in active_days:
+            day_arabic = day_map.get(day_key, "")
+            day_schedule = weekly_schedule[day_key]
+
+            for category_index, category in enumerate(self.detail_categories):
+                row = table.rows[row_index]
+                if category_index == 0:
+                    day_cell = row.cells[ColumnType.DAYS.value]
+                    day_cell.text = day_arabic
+                    day_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    self._set_cell_rtl(day_cell)
+                    if row_index + 3 < len(table.rows):
+                        day_cell.merge(table.rows[row_index + 3].cells[ColumnType.DAYS.value])
+                        self._apply_day_cell_borders(day_cell, row_index)
+
+                category_cell = row.cells[ColumnType.CATEGORIES.value]
+                category_cell.text = category
+                category_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                self._set_cell_rtl(category_cell)
+
+                for slot_index, slot_key in enumerate(self.slot_keys):
+                    main_cell = row.cells[self.time_slot_positions[slot_index]]
+                    half_cell = row.cells[self.time_slot_half_positions[slot_index]]
+                    schedule_entry = day_schedule[slot_key]
+
+                    if schedule_entry:
+                        if category_index == 0: content = schedule_entry.course_name
+                        elif category_index == 1: content = schedule_entry.location
+                        elif category_index == 2: content = schedule_entry.instructor
+                        elif category_index == 3: content = schedule_entry.assistant
+                        else: content = ""
+
+                        if schedule_entry.is_half_slot:
+                            main_cell.text = content
+                            half_cell.text = ""
+                        else:
+                            main_cell.text = content
+                            half_cell.text = ""
+                            main_cell.merge(half_cell)
+                            if len(main_cell.paragraphs) > 1:
+                                for i in range(len(main_cell.paragraphs) - 1, 0, -1):
+                                    main_cell.paragraphs[i]._element.getparent().remove(main_cell.paragraphs[i]._element)
+                            main_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            self._set_cell_rtl(main_cell)
+                    else:
+                        main_cell.text = ""
+                        half_cell.text = ""
+                        main_cell.merge(half_cell)
+                        if len(main_cell.paragraphs) > 1:
+                            for i in range(len(main_cell.paragraphs) - 1, 0, -1):
+                                main_cell.paragraphs[i]._element.getparent().remove(main_cell.paragraphs[i]._element)
+                        main_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        self._set_cell_rtl(main_cell)
+
+                for pos in self.separator_positions:
+                    row.cells[pos].text = ""
+                
+                row_index += 1
+
+    def generate_multi_staff_word_document(self, multi_staff_schedule: MultiStaffSchedule, output_path: str, staff_type: str) -> None:
+        """Generate Word document with multiple tables for each staff member"""
+        doc = self.create_document()
+        # Use a generic header/footer for staff view
+        section = doc.sections[0]
+        section.header.is_linked_to_previous = False
+        section.footer.is_linked_to_previous = False
+        self._add_header_to_section(section, "", "100")  # Generic header
+        self._add_footer_to_section(section, "100", "comm")  # Generic footer
+
+        MAX_TABLES_PER_PAGE = 2
+        tables_on_page = 0
+
+        for schedule in multi_staff_schedule.schedules:
+            print(f"📄 Generating table for {schedule.staff_name}")
+
+            active_days = [day for day, day_schedule in schedule.weekly_schedule.items() if any(day_schedule.values())]
+            if not active_days:
+                continue
+
+            # Add page break if MAX_TABLES_PER_PAGE is reached and it's not the very first table
+            if tables_on_page >= MAX_TABLES_PER_PAGE:
+                doc.add_page_break()
+                tables_on_page = 0
+
+            self.add_staff_title(doc, schedule.staff_name)
+            self.create_staff_table_structure(doc, schedule.weekly_schedule)
+            
+            tables_on_page += 1
+
+        doc.save(output_path)

@@ -1,7 +1,10 @@
 import csv
 import pandas as pd
 from typing import List, Dict, Any
-from .models import CSVRow, LocationSchedule, MultiLocationSchedule, ScheduleEntry, DaySchedule, WeeklySchedule, DayOfWeek, SpecialityLevelSchedule, MultiLevelSchedule
+from .models import (CSVRow, LocationSchedule, MultiLocationSchedule, 
+                     ScheduleEntry, DaySchedule, WeeklySchedule, DayOfWeek, 
+                     SpecialityLevelSchedule, MultiLevelSchedule, 
+                     StaffSchedule, MultiStaffSchedule)
 
 
 class CSVConverter:
@@ -233,3 +236,39 @@ class CSVConverter:
         """Main method to convert CSV/Excel file to multi-location JSON structure"""
         csv_rows = self.read_file(file_path)
         return self.convert_to_multi_location_schedule(csv_rows)
+
+    def group_rows_by_staff(self, csv_rows: List[CSVRow], staff_type: str) -> Dict[str, List[CSVRow]]:
+        """Group CSV rows by staff member (main_tutor or helping_stuff)"""
+        grouped_rows = {}
+        for csv_row in csv_rows:
+            if staff_type == "helping_stuff" and csv_row.activity_type != "تمارين":
+                continue
+            staff_field = getattr(csv_row, staff_type)
+            if staff_field:
+                # Handle comma-separated staff names
+                staff_names = [name.strip() for name in staff_field.split(',')]
+                for name in staff_names:
+                    if name not in grouped_rows:
+                        grouped_rows[name] = []
+                    grouped_rows[name].append(csv_row)
+        return grouped_rows
+
+    def convert_to_multi_staff_schedule(self, csv_rows: List[CSVRow], staff_type: str) -> MultiStaffSchedule:
+        """Convert CSV rows to multi-staff schedule"""
+        grouped_rows = self.group_rows_by_staff(csv_rows, staff_type)
+        schedules = []
+        for staff_name, rows in grouped_rows.items():
+            print(f"📋 Processing {staff_name}: {len(rows)} entries")
+            weekly_schedule = self.convert_to_weekly_schedule(rows)
+            staff_schedule = StaffSchedule(
+                staff_name=staff_name,
+                weekly_schedule=weekly_schedule
+            )
+            schedules.append(staff_schedule)
+        schedules.sort(key=lambda x: x.staff_name)
+        return MultiStaffSchedule(schedules=schedules)
+
+    def convert_file_to_multi_staff_json(self, file_path: str, staff_type: str) -> MultiStaffSchedule:
+        """Main method to convert CSV/Excel file to multi-staff JSON structure"""
+        csv_rows = self.read_file(file_path)
+        return self.convert_to_multi_staff_schedule(csv_rows, staff_type)

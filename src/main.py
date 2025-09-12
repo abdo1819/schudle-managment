@@ -1,7 +1,8 @@
 from typing import Optional
 from .csv_converter import CSVConverter
-from .word_generator import WordGenerator, LocationWordGenerator
-from .models import WeeklySchedule, MultiLevelSchedule, MultiLocationSchedule
+from .word_generator import WordGenerator, LocationWordGenerator, StaffWordGenerator
+from .models import (WeeklySchedule, MultiLevelSchedule, MultiLocationSchedule, 
+                     MultiStaffSchedule)
 
 
 class ScheduleConverter:
@@ -11,6 +12,7 @@ class ScheduleConverter:
         self.csv_converter = CSVConverter()
         self.word_generator = WordGenerator()
         self.location_word_generator = LocationWordGenerator()
+        self.staff_word_generator = StaffWordGenerator()
     
     def convert_file_to_word(self, file_path: str, output_path: str) -> None:
         """Convert CSV/Excel file to Word document (single table - backward compatibility)"""
@@ -63,6 +65,24 @@ class ScheduleConverter:
             
         except Exception as e:
             print(f"Error during multi-location conversion: {e}")
+            raise
+
+    def convert_file_to_multi_staff_word(self, file_path: str, output_path: str, staff_type: str) -> None:
+        """Convert CSV/Excel file to Word document with multiple tables for each staff member"""
+        try:
+            # Step 1: Convert file to multi-staff JSON structure
+            print(f"Converting file: {file_path} for {staff_type}")
+            multi_staff_schedule = self.csv_converter.convert_file_to_multi_staff_json(file_path, staff_type)
+            
+            # Step 2: Generate Word document with multiple tables
+            print(f"Generating multi-staff Word document: {output_path}")
+            self.staff_word_generator.generate_multi_staff_word_document(multi_staff_schedule, output_path, staff_type)
+            
+            print(f"Multi-staff conversion for {staff_type} completed successfully!")
+            print(f"Generated {len(multi_staff_schedule.schedules)} tables for different staff members")
+            
+        except Exception as e:
+            print(f"Error during multi-staff conversion: {e}")
             raise
     
     def get_weekly_schedule(self, file_path: str) -> WeeklySchedule:
