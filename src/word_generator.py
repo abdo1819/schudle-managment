@@ -3,6 +3,7 @@ from typing import List, Dict, Any
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.section import WD_ORIENT
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
 from .models import WeeklySchedule, ScheduleEntry, DayOfWeek, TimeSlot, DetailCategory, TableCell, MultiLevelSchedule, SpecialityLevelSchedule
@@ -49,7 +50,7 @@ BASE_LEVEL_CONFIG = {
         "semester": "الفصل الدراسي الأول",
         "division_prefix": "شعبة",
         "level_prefix": "الفرقة",
-        "schedule_template": "شئون التعليم والطلاب نموذج الجداول الدراسية"
+        "schedule_template": "شئون التعليم والطلاب الجداول الدراسية"
     },
     "footer": {
         "dean_title": "عميد الكلية",
@@ -95,7 +96,7 @@ SPECIALTY_OVERRIDES = {
     }
 }
 
-# Function to get mapped values
+# Function to get mapped value
 def _get_mapped_level(level: str) -> str:
     """Get the Arabic representation of the level"""
     return LEVEL_MAPPING.get(level, level)
@@ -203,9 +204,10 @@ class FontConfig:
 class TableDimensions:
     """Table dimension constants"""
     # Page dimensions
-    A4_WIDTH_INCHES = 8.27
+    A4_LANDSCAPE_WIDTH_INCHES = 11.69
+    A4_LANDSCAPE_HEIGHT_INCHES = 8.27
     MARGIN_INCHES = 0.5
-    AVAILABLE_WIDTH_INCHES = A4_WIDTH_INCHES - (2 * MARGIN_INCHES)
+    AVAILABLE_WIDTH_INCHES = A4_LANDSCAPE_WIDTH_INCHES - (2 * MARGIN_INCHES)
     
     # Table structure
     TOTAL_ROWS = 21  # 5 days * 4 categories + 1 header
@@ -214,7 +216,7 @@ class TableDimensions:
     # Column widths (in inches)
     DAYS_COLUMN_WIDTH = 0.8
     CATEGORIES_COLUMN_WIDTH = 1.0
-    TIME_SLOT_WIDTH = 1.0
+    TIME_SLOT_WIDTH = 1.8
     TIME_SLOT_HALF_WIDTH = 0.2  # Half width for half slots
     SEPARATOR_WIDTH = 0.2
     
@@ -295,9 +297,12 @@ class WordGenerator:
         """Create a new Word document"""
         doc = Document()
         
-        # Set document margins
+        # Set document to landscape A4
         sections = doc.sections
         for section in sections:
+            section.orientation = WD_ORIENT.LANDSCAPE
+            section.page_width = Inches(TableDimensions.A4_LANDSCAPE_WIDTH_INCHES)
+            section.page_height = Inches(TableDimensions.A4_LANDSCAPE_HEIGHT_INCHES)
             section.top_margin = Inches(TableDimensions.MARGIN_INCHES)
             section.bottom_margin = Inches(TableDimensions.MARGIN_INCHES)
             section.left_margin = Inches(TableDimensions.MARGIN_INCHES)
@@ -812,7 +817,7 @@ class WordGenerator:
         header_table.allow_autofit = False
         
         # Set column widths (right, center, left)
-        column_widths = [2.5, 3.0, 2.5]  # in inches
+        column_widths = [3.5, 3.69, 3.5]  # in inches
         for i, column in enumerate(header_table.columns):
             for cell in column.cells:
                 tc = cell._tc
@@ -961,10 +966,10 @@ class WordGenerator:
         
         if has_program_manager:
             cols = 4
-            column_widths = [2.0, 2.0, 2.0, 2.0]  # Equal width for 4 columns
+            column_widths = [2.67, 2.67, 2.67, 2.68]  # Equal width for 4 columns
         else:
             cols = 3
-            column_widths = [2.5, 3.0, 2.5]  # in inches
+            column_widths = [3.5, 3.69, 3.5]  # in inches
         
         # Add footer table with dynamic columns
         footer_table = footer.add_table(rows=2, cols=cols, width=Inches(TableDimensions.AVAILABLE_WIDTH_INCHES))
