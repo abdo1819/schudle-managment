@@ -5,6 +5,7 @@ Test script to demonstrate multi-level schedule conversion
 
 import sys
 import os
+from datetime import datetime
 from src.main import ScheduleConverter
 
 
@@ -28,7 +29,17 @@ def test_multi_level_conversion():
             print(f"   - {file}")
         return
     
-    output_file = "output_multi_level.docx"
+    # Create timestamped output folder and filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    output_folder = f"output_{timestamp}"
+    
+    # Create the output folder if it doesn't exist
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+        print(f"📁 Created output folder: {output_folder}")
+    
+    # Include timestamp in the filename
+    output_file = os.path.join(output_folder, f"output_multi_level_{timestamp}.docx")
     
     print(f"🧪 Testing multi-level conversion with: {input_file}")
     print("=" * 50)
@@ -49,6 +60,7 @@ def test_multi_level_conversion():
         converter.convert_file_to_multi_level_word(input_file, output_file)
         
         print(f"\n✅ Test completed successfully!")
+        print(f"📁 Output folder: {output_folder}")
         print(f"📄 Output file: {output_file}")
         print(f"📊 Generated {len(multi_level_schedule.schedules)} tables")
         
