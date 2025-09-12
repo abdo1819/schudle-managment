@@ -6,7 +6,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.section import WD_ORIENT
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
-from .models import WeeklySchedule, ScheduleEntry, DayOfWeek, TimeSlot, DetailCategory, TableCell, MultiLevelSchedule, SpecialityLevelSchedule
+from .models import MultiLocationSchedule, WeeklySchedule, ScheduleEntry, DayOfWeek, TimeSlot, DetailCategory, TableCell, MultiLevelSchedule, SpecialityLevelSchedule
 from enum import Enum
 from datetime import datetime
 import os
@@ -1131,3 +1131,84 @@ class WordGenerator:
             self.create_table_structure(doc, schedule.weekly_schedule)
         
         doc.save(output_path)
+
+
+class LocationWordGenerator(WordGenerator):
+    """Generates Word document with schedule table for each location"""
+
+    def _fill_header_content(self, header_table, location: str) -> None:
+        """Fill header table with content for location view"""
+        # Get base configuration
+        header_config = BASE_LEVEL_CONFIG["header"]
+
+        # Right column (University/Faculty/Department info)
+        header_table.rows[0].cells[0].text = header_config["university_name"]
+        header_table.rows[1].cells[0].text = header_config["faculty_name"]
+        header_table.rows[2].cells[0].text = f"{header_config['department_prefix']}"
+
+        # Center column (Logo and title)
+        logo_cell = header_table.rows[0].cells[1]
+        self._add_logo_to_cell(logo_cell)
+
+        title_cell = header_table.rows[2].cells[1]
+        title_cell.text = header_config["schedule_template"]
+        title_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        self._set_cell_rtl(title_cell)
+
+        header_table.rows[1].cells[1].text = ""
+
+        # Left column (Academic details)
+        header_table.rows[0].cells[2].text = header_config["academic_year"]
+        header_table.rows[1].cells[2].text = header_config["semester"]
+        header_table.rows[2].cells[2].text = f"جدول إشغال {location}"
+
+    def _add_header_to_section(self, section, location: str) -> None:
+        """Add header to a specific section for location view"""
+        header = section.header
+        self._clear_section_content(header)
+        header_table = self._create_header_table(header)
+        self._fill_header_content(header_table, location)
+        self._apply_header_formatting(header_table)
+
+    def add_location_title(self, doc: Document, location: str) -> None:
+        """Add title for location"""
+        doc.add_paragraph()
+        return
+        title_para = doc.add_paragraph()
+        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        title_text = f"جدول إشغال {location}"
+        title_run = title_para.add_run(title_text)
+        title_run.font.name = FontConfig.FONT_NAME
+        title_run.font.size = FontConfig.TITLE_SIZE
+        title_run.font.bold = True
+        self._set_paragraph_rtl(title_para)
+        doc.add_paragraph()
+
+    def generate_multi_location_word_document(self, multi_location_schedule: MultiLocationSchedule, output_path: str) -> None:
+        """Generate Word document with multiple tables for each location"""
+        doc = self.create_document()
+
+        for i, schedule in enumerate(multi_location_schedule.schedules):
+            print(f"📄 Generating table for {schedule.location}")
+
+            if i > 0:
+                doc.add_page_break()
+                new_section = doc.add_section()
+                new_section.header.is_linked_to_previous = False
+                new_section.footer.is_linked_to_previous = False
+                self._add_header_to_section(new_section, schedule.location)
+                # Using a generic footer, since level and specialty are not available
+                self._add_footer_to_section(new_section, "100", "comm")
+            else:
+                section = doc.sections[0]
+                section.header.is_linked_to_previous = False
+                section.footer.is_linked_to_previous = False
+                self._add_header_to_section(section, schedule.location)
+                # Using a generic footer, since level and specialty are not available
+                self._add_footer_to_section(section, "100", "comm")
+
+            self.add_location_title(doc, schedule.location)
+            self.create_table_structure(doc, schedule.weekly_schedule)
+
+        doc.save(output_path)
+

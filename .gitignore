@@ -152,3 +152,4 @@ cython_debug/
 Thumbs.db
 empty_schedule.docx
 *.docx
+*.pdf

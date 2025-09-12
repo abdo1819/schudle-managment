@@ -111,6 +111,28 @@ class MultiLevelSchedule(BaseModel):
         return None
 
 
+class LocationSchedule(BaseModel):
+    """Schedule for a specific location"""
+    location: str
+    weekly_schedule: WeeklySchedule
+
+
+class MultiLocationSchedule(BaseModel):
+    """Complete multi-location schedule with all locations"""
+    schedules: List[LocationSchedule]
+
+    def get_locations(self) -> List[str]:
+        """Get list of all locations"""
+        return [schedule.location for schedule in self.schedules]
+
+    def get_schedule_by_location(self, location: str) -> Optional[WeeklySchedule]:
+        """Get weekly schedule for a specific location"""
+        for schedule in self.schedules:
+            if schedule.location == location:
+                return schedule.weekly_schedule
+        return None
+
+
 class TableCell(BaseModel):
     """Model for a table cell"""
     content: str

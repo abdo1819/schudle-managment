@@ -1,7 +1,7 @@
 import csv
 import pandas as pd
 from typing import List, Dict, Any
-from .models import CSVRow, ScheduleEntry, DaySchedule, WeeklySchedule, DayOfWeek, SpecialityLevelSchedule, MultiLevelSchedule
+from .models import CSVRow, LocationSchedule, MultiLocationSchedule, ScheduleEntry, DaySchedule, WeeklySchedule, DayOfWeek, SpecialityLevelSchedule, MultiLevelSchedule
 
 
 class CSVConverter:
@@ -203,3 +203,33 @@ class CSVConverter:
         """Main method to convert CSV/Excel file to multi-level JSON structure"""
         csv_rows = self.read_file(file_path)
         return self.convert_to_multi_level_schedule(csv_rows)
+
+    def group_rows_by_location(self, csv_rows: List[CSVRow]) -> Dict[str, List[CSVRow]]:
+        """Group CSV rows by location"""
+        grouped_rows = {}
+        for csv_row in csv_rows:
+            location = csv_row.location
+            if location not in grouped_rows:
+                grouped_rows[location] = []
+            grouped_rows[location].append(csv_row)
+        return grouped_rows
+
+    def convert_to_multi_location_schedule(self, csv_rows: List[CSVRow]) -> MultiLocationSchedule:
+        """Convert CSV rows to multi-location schedule"""
+        grouped_rows = self.group_rows_by_location(csv_rows)
+        schedules = []
+        for location, rows in grouped_rows.items():
+            print(f"📋 Processing {location}: {len(rows)} entries")
+            weekly_schedule = self.convert_to_weekly_schedule(rows)
+            location_schedule = LocationSchedule(
+                location=location,
+                weekly_schedule=weekly_schedule
+            )
+            schedules.append(location_schedule)
+        schedules.sort(key=lambda x: x.location)
+        return MultiLocationSchedule(schedules=schedules)
+
+    def convert_file_to_multi_location_json(self, file_path: str) -> MultiLocationSchedule:
+        """Main method to convert CSV/Excel file to multi-location JSON structure"""
+        csv_rows = self.read_file(file_path)
+        return self.convert_to_multi_location_schedule(csv_rows)
