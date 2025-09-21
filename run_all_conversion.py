@@ -62,10 +62,10 @@ def test_multi_level_conversion():
 
         # --- Staff Load View ---
         print("\n🔄 Generating Word document for main tutor load view...")
-        converter.convert_file_to_multi_staff_word(input_file, output_main_tutor_file, 'main_tutor')
+        converter.convert_file_to_multi_staff_word(input_file, output_main_tutor_file, 'main_tutor_write')
 
         print("\n🔄 Generating Word document for helping stuff load view...")
-        converter.convert_file_to_multi_staff_word(input_file, output_helping_stuff_file, 'helping_stuff')
+        converter.convert_file_to_multi_staff_word(input_file, output_helping_stuff_file, 'helping_stuff_write')
         
         print(f"\n✅ Test completed successfully!")
         print(f"📁 Output folder: {output_folder}")

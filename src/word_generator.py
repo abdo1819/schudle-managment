@@ -1208,14 +1208,14 @@ class LocationWordGenerator(WordGenerator):
                 new_section.footer.is_linked_to_previous = False
                 self._add_header_to_section(new_section, schedule.location)
                 # Using a generic footer, since level and specialty are not available
-                self._add_footer_to_section(new_section, "100", "comm")
+                self._add_footer_to_section(new_section, "400", "comm")
             else:
                 section = doc.sections[0]
                 section.header.is_linked_to_previous = False
                 section.footer.is_linked_to_previous = False
                 self._add_header_to_section(section, schedule.location)
                 # Using a generic footer, since level and specialty are not available
-                self._add_footer_to_section(section, "100", "comm")
+                self._add_footer_to_section(section, "400", "comm")
 
             self.add_location_title(doc, schedule.location)
             self.create_table_structure(doc, schedule.weekly_schedule)
@@ -1334,7 +1334,7 @@ class StaffWordGenerator(WordGenerator):
         section.header.is_linked_to_previous = False
         section.footer.is_linked_to_previous = False
         self._add_header_to_section(section, "", "100")  # Generic header
-        self._add_footer_to_section(section, "100", "comm")  # Generic footer
+        self._add_footer_to_section(section, "400", "comm")  # Generic footer
 
         MAX_TABLES_PER_PAGE = 2
         tables_on_page = 0

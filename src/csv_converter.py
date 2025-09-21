@@ -241,7 +241,7 @@ class CSVConverter:
         """Group CSV rows by staff member (main_tutor or helping_stuff)"""
         grouped_rows = {}
         for csv_row in csv_rows:
-            if staff_type == "helping_stuff" and csv_row.activity_type != "تمارين":
+            if staff_type == "helping_stuff_write" and csv_row.activity_type != "تمارين":
                 continue
             staff_field = getattr(csv_row, staff_type)
             if staff_field:

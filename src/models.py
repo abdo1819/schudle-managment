@@ -49,8 +49,8 @@ class CSVRow(BaseModel):
     teaching_hours: Optional[str] = Field(alias="teaching_hours", default=None)
     teaching_hours_printable: Optional[str] = Field(alias="teachin_hourse_printalble", default=None)
     sp_code: Optional[str] = None
-    main_tutor: Optional[str] = None
-    helping_stuff: Optional[str] = None
+    # main_tutor: Optional[str] = None
+    # helping_stuff: Optional[str] = None
     main_tutor_write: Optional[str] = Field(alias="main_tutor_write", default=None)
     helping_stuff_write: Optional[str] = Field(alias="helping_stuff_write", default=None)
 
